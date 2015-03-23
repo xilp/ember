@@ -51,6 +51,16 @@ func (c *Client) Close() error {
 	return nil
 }
 
+func (c *Client) MakeRpcObj(obj interface{}) (err error) {
+	typ := reflect.TypeOf(obj)
+	for m := 0; m < typ.NumMethod(); m++ {
+		method := typ.Method(m)
+		mname := method.Name
+		c.MakeRpc(mname, method)
+	}
+	return
+}
+
 func (c *Client) MakeRpc(rpcName string, fptr interface{}) (err error) {
 	defer func() {
 		if e := recover(); e != nil {

@@ -61,6 +61,16 @@ func (s *Server) Stop() error {
 	return nil
 }
 
+func (s *Server) RegisterObj(obj interface{}) (err error) {
+	typ := reflect.TypeOf(obj)
+	for m := 0; m < typ.NumMethod(); m++ {
+		method := typ.Method(m)
+		mname := method.Name
+		s.Register(mname, method)
+	}
+	return	
+}
+
 func (s *Server) Register(name string, f interface{}) (err error) {
 	defer func() {
 		if e := recover(); e != nil {

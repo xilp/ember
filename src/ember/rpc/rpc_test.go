@@ -131,3 +131,36 @@ func TestRpc3(t *testing.T) {
 		t.Fatal("must error")
 	}
 }
+
+type Integer int;
+
+func (p *Integer) Larger(a, b int) (bool, error) {
+	return a < b, nil
+}
+
+func (p *Integer) Add(a, b int) (int, error) {
+	return a + b, nil
+}
+
+func TestRpc0(t *testing.T) {
+	var a Integer
+
+	s := newTestServer()
+	s.RegisterObj(&a)
+
+	c := newTestClient()
+	var b Integer
+	if err := c.MakeRpcObj(&b); err != nil {
+		t.Fatal(err)
+	}
+
+	if _, err := b.Larger(10, 6); err != nil {
+		t.Fatal(err)
+	}  
+
+	if _, err := b.Add(9, 11); err != nil {
+		t.Fatal(err)
+	}
+
+
+}
