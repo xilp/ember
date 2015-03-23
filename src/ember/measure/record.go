@@ -1,4 +1,4 @@
-package spy
+package measure
 
 func Max(a, b int64) int64 {
 	if a >= b {
