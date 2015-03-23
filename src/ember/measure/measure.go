@@ -1,4 +1,4 @@
-package spy
+package measure
 
 import (
 	"time"
@@ -26,7 +26,7 @@ func (p *Measure) Record(name string, value int64) {
 	if last < now {
 		p.data.Padding(int((now - last) / p.interval))
 	}
-	p.data.Merge(now, name, value)
+	p.data.Record(now, name, value)
 }
 
 func (p *Measure) round(time int64) int64 {
