@@ -162,9 +162,13 @@ func TestRpc0(t *testing.T) {
 	if err := c.MakeRpcObj(&b); err != nil {
 		t.Fatal(err)
 	}
+	
 
-	if _, err := b.Larger(10, 1); err != nil {
+
+	if larger, err := b.Larger(10, 1); err != nil {
 		t.Fatal(err)
+	} else {
+		println(larger)	
 	}
 	println("-------------------- E")
 

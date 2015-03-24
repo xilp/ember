@@ -8,16 +8,14 @@ import (
 type Client struct {
 	sync.Mutex
 	
-	network string
-	addr string
+	url string
 }
 
-func NewClient(network, addr string) *Client {
+func NewClient(url string) *Client {
 	RegisterType(RpcError{})
 
 	c := new(Client)
-	c.network = network
-	c.addr = addr
+	c.url = url
 	
 	return c
 }
@@ -71,6 +69,15 @@ func (c *Client) call(fn reflect.Value, name string, in []reflect.Value) []refle
 		inArgs[i] = in[i].Interface()
 	}
 
+	// TODO need Marshal and send request
+
+	in := NewInArgs(name, inArgs)
+	data, err := json.Marshal(group)
+	
+	
+	
+
+	
 	data, err := encodeData(name, inArgs)
 	if err != nil {
 		return c.returnCallError(fn, err)
@@ -137,23 +144,17 @@ func (c *Client) returnCallError(fn reflect.Value, err error) []reflect.Value {
 	return out
 }
 
+func NewInArgs(name string, args []interface{}) *InArgs {
+	a := new(InArgs)
+	a.Name := name
+	a.args := args
+	return a
+}	
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+type InArgs struct {
+    Name string `json:"name"`
+    Args []interface{} `json:"args"`
+}
 
 
 

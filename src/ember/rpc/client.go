@@ -97,9 +97,11 @@ func (c *Client) MakeRpc(rpcName string, fptr interface{}) (err error) {
 }
 
 func (c *Client) call(fn reflect.Value, name string, in []reflect.Value) []reflect.Value {
+	println(name)
 	inArgs := make([]interface{}, len(in))
 	for i := 0; i < len(in); i++ {
 		inArgs[i] = in[i].Interface()
+		println(reflect.ValueOf(in[i].Interface()).Int())
 	}
 
 	data, err := encodeData(name, inArgs)
