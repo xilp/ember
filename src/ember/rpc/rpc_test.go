@@ -4,6 +4,7 @@ import (
 	"errors"
 	"sync"
 	"testing"
+	"time"
 )
 
 var testServerOnce sync.Once
@@ -37,7 +38,7 @@ func test_Rpc1(id int) (int, string, error) {
 	return id * 10, "abc", nil
 }
 
-func TestRpc1(t *testing.T) {
+func _TestRpc1(t *testing.T) {
 	s := newTestServer()
 
 	s.Register("rpc1", test_Rpc1)
@@ -71,7 +72,7 @@ func test_Rpc2(ids []int) ([]int, error) {
 	return []int{ids[0] * 10}, nil
 }
 
-func TestRpc2(t *testing.T) {
+func _TestRpc2(t *testing.T) {
 	s := newTestServer()
 
 	s.Register("rpc2", test_Rpc2)
@@ -110,7 +111,7 @@ func test_Rpc3(id int) error {
 	return errors.New("hello world")
 }
 
-func TestRpc3(t *testing.T) {
+func _TestRpc3(t *testing.T) {
 	s := newTestServer()
 
 	s.Register("rpc3", test_Rpc3)
@@ -143,24 +144,31 @@ func (p *Integer) Add(a, b int) (int, error) {
 }
 
 func TestRpc0(t *testing.T) {
+	println("-------------------- B")
 	var a Integer
 
 	s := newTestServer()
 	s.RegisterObj(&a)
+	time.Sleep(time.Second)
 
 	c := newTestClient()
-	var b Integer
+	
+	type B struct {
+		Larger func(a, b int)(bool, error)	
+		Add func(a, b int)(int, error)	
+	}
+	var b B
+
 	if err := c.MakeRpcObj(&b); err != nil {
 		t.Fatal(err)
 	}
 
-	if _, err := b.Larger(10, 6); err != nil {
-		t.Fatal(err)
-	}  
-
-	if _, err := b.Add(9, 11); err != nil {
+	if _, err := b.Larger(10, 1); err != nil {
 		t.Fatal(err)
 	}
+	println("-------------------- E")
 
-
+	//if _, err := b.Add(10, 1); err != nil {
+	//	t.Fatal(err)
+	//}
 }

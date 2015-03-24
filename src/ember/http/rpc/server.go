@@ -1,23 +1,22 @@
 package rpc
 
 import (
-	"fmt"
-	"net"
 	"reflect"
 	"sync"
+	"net/http"
+	"io/ioutil"
 )
 
 type Server struct {
 	sync.Mutex
-
+	
 	network string
-	addr    string
-	funcs   map[string]reflect.Value
+	addr string
+	funcs map[string]reflect.Value
 
 	listener net.Listener
 	running  bool
-	
-	obj interface{}
+	objs interface{}
 }
 
 func NewServer(network, addr string) *Server {
@@ -28,11 +27,10 @@ func NewServer(network, addr string) *Server {
 	s.addr = addr
 
 	s.funcs = make(map[string]reflect.Value)
-
 	return s
 }
 
-func (s *Server) Start() error {
+func (s *Server) Run() error {
 	var err error
 	s.listener, err = net.Listen(s.network, s.addr)
 	if err != nil {
@@ -47,16 +45,6 @@ func (s *Server) Start() error {
 			continue
 		}
 		go s.onConn(conn)
-	}
-
-	return nil
-}
-
-func (s *Server) Stop() error {
-	s.running = false
-
-	if s.listener != nil {
-		s.listener.Close()
 	}
 
 	return nil
@@ -77,7 +65,7 @@ func (s *Server) RegisterObj(obj interface{}) (err error) {
 	return	
 }
 
-func (s *Server) Register(name string, f interface{}) (err error) {
+func (s *Server) register(name string, f interface{}) (err error) {
 	defer func() {
 		if e := recover(); e != nil {
 			err = fmt.Errorf("%s is not callable", name)
@@ -113,43 +101,28 @@ func (s *Server) Register(name string, f interface{}) (err error) {
 	return
 }
 
-func (s *Server) onConn(co net.Conn) {
-	c := new(conn)
-	c.co = co
-
-	defer func() {
-		if e := recover(); e != nil {
-			//later log
-			if err, ok := e.(error); ok {
-				println("recover", err.Error())
-			} else if err, ok := e.(string); ok {
-				println("recover", err)
-			}
-		}
-		c.Close()
-	}()
-
-	for {
-		data, err := c.ReadMessage()
-		if err != nil {
-			println("read error ", err.Error())
-			return
-		}
-
-		data, err = s.handle(data)
-		if err != nil {
-			println("handle error ", err.Error())
-			return
-		}
-		err = c.WriteMessage(data)
-		if err != nil {
-			println("write error ", err.Error())
-			return
-		}
+func routeTo(w http.ResponseWriter, r *http.Request) {
+	defer r.Body.Close()
+	data, err := ioutil.ReadAll(r.Body)
+	if err != nil {
+		println("read body error", err.Error())
 	}
+
+	config := &Config{}
+	err := json.Unmarshal(data, config)
+	if err != nil {
+		println("unmarshal err", err.Error())
+	}
+
+	name := config.Name
+	args := config.Args
+	
+
+		
+	
 }
 
-func (s *Server) handle(data []byte) ([]byte, error) {
+func (s *Server) handle(name string, args []interface{}) ([]byte, error) {
 	name, args, err := decodeData(data)
 	if err != nil {
 		return nil, err
@@ -192,3 +165,15 @@ func (s *Server) handle(data []byte) ([]byte, error) {
 
 	return encodeData(name, outArgs)
 }
+
+type Config struct {
+	Name string `json:"name"`
+	Args []interface{} `json:"args"`
+}
+
+
+
+
+
+
+

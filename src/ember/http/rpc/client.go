@@ -1,54 +1,25 @@
 package rpc
 
 import (
-	"container/list"
-	"fmt"
 	"reflect"
 	"sync"
 )
 
 type Client struct {
 	sync.Mutex
-
+	
 	network string
-	addr    string
-
-	maxIdleConns int
-
-	conns *list.List
+	addr string
 }
 
-func NewClient(network, addr string, maxIdleConns int) *Client {
+func NewClient(network, addr string) *Client {
 	RegisterType(RpcError{})
 
 	c := new(Client)
 	c.network = network
 	c.addr = addr
-
-	c.maxIdleConns = maxIdleConns
-
-	c.conns = list.New()
-
+	
 	return c
-}
-
-func (c *Client) Close() error {
-	c.Lock()
-
-	for {
-		if c.conns.Len() > 0 {
-			v := c.conns.Front()
-
-			co := v.Value.(*conn)
-			co.Close()
-			c.conns.Remove(v)
-		} else {
-			break
-		}
-	}
-
-	c.Unlock()
-	return nil
 }
 
 func (c *Client) MakeRpcObj(obj interface{}) (err error) {
@@ -58,13 +29,13 @@ func (c *Client) MakeRpcObj(obj interface{}) (err error) {
 		structField := typ.Field(i)
 		name := structField.Name
 		field := val.Field(i)
-		err = c.MakeRpc(name, field.Addr().Interface())
+		err = c.makeRpc(name, field.Addr().Interface())
 		return
 	}
 	return
 }
 
-func (c *Client) MakeRpc(rpcName string, fptr interface{}) (err error) {
+func (c *Client) makeRpc(rpcName string, fptr interface{}) (err error) {
 	defer func() {
 		if e := recover(); e != nil {
 			err = fmt.Errorf("make rpc error", e.(error).Error())
@@ -73,7 +44,7 @@ func (c *Client) MakeRpc(rpcName string, fptr interface{}) (err error) {
 
 	fn := reflect.ValueOf(fptr).Elem()
 
-	nOut := fn.Type().NumOut()
+	nOut := fn.Type().NumOut();
 	if nOut == 0 || fn.Type().Out(nOut-1).Kind() != reflect.Interface {
 		err = fmt.Errorf("%s return final output param must be error interface", rpcName)
 		return
@@ -86,14 +57,12 @@ func (c *Client) MakeRpc(rpcName string, fptr interface{}) (err error) {
 	}
 
 	f := func(in []reflect.Value) []reflect.Value {
-
 		return c.call(fn, rpcName, in)
 	}
 
 	v := reflect.MakeFunc(fn.Type(), f)
 	fn.Set(v)
-	
-	return
+	return 
 }
 
 func (c *Client) call(fn reflect.Value, name string, in []reflect.Value) []reflect.Value {
@@ -168,28 +137,23 @@ func (c *Client) returnCallError(fn reflect.Value, err error) []reflect.Value {
 	return out
 }
 
-func (c *Client) popConn() (*conn, error) {
-	c.Lock()
-	if c.conns.Len() > 0 {
-		v := c.conns.Front()
-		c.conns.Remove(v)
-		c.Unlock()
 
-		return v.Value.(*conn), nil
-	}
-	c.Unlock()
-	return newConn(c.network, c.addr)
-}
 
-func (c *Client) pushConn(co *conn) error {
-	c.Lock()
-	if c.conns.Len() >= c.maxIdleConns {
-		c.Unlock()
-		co.Close()
-		return nil
-	} else {
-		c.conns.PushBack(co)
-	}
-	c.Unlock()
-	return nil
-}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
