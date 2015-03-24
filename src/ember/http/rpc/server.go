@@ -8,7 +8,7 @@ import (
 )
 
 type Server struct {
-	sync.Mutex
+	mu sync.Mutex
 	
 	network string
 	addr string
@@ -23,28 +23,20 @@ func NewServer(network, addr string) *Server {
 	RegisterType(RpcError{})
 
 	s := new(Server)
+	s.mu := &sync.Mutex{} 
+
 	s.network = network
 	s.addr = addr
 
 	s.funcs = make(map[string]reflect.Value)
+	
 	return s
 }
 
 func (s *Server) Run() error {
-	var err error
-	s.listener, err = net.Listen(s.network, s.addr)
+	err := s.start()
 	if err != nil {
 		return err
-	}
-
-	s.running = true
-
-	for s.running {
-		conn, err := s.listener.Accept()
-		if err != nil {
-			continue
-		}
-		go s.onConn(conn)
 	}
 
 	return nil
@@ -89,16 +81,21 @@ func (s *Server) register(name string, f interface{}) (err error) {
 		return
 	}
 
-	s.Lock()
+	mu.Lock()
 	if _, ok := s.funcs[name]; ok {
 		err = fmt.Errorf("%s has registered", name)
-		s.Unlock()
+		mu.Unlock()
 		return
 	}
 
 	s.funcs[name] = v
-	s.Unlock()
+	mu.Unlock()
 	return
+}
+
+func (s *Server) start() error {
+	http.HandleFunc("/Router", routeTo)
+	return http.ListenAndServe(":" + strconv.Itoa(config.Port), nil)
 }
 
 func routeTo(w http.ResponseWriter, r *http.Request) {
@@ -107,19 +104,38 @@ func routeTo(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		println("read body error", err.Error())
 	}
-
-	config := &Config{}
-	err := json.Unmarshal(data, config)
+	
+	var f = &interface{}
+	err := json.Unmarshal(data, f)
 	if err != nil {
 		println("unmarshal err", err.Error())
 	}
 
-	name := config.Name
-	args := config.Args
-	
+	m := f.(map[string]interface{})
+	dataMap := make(map[string]interface{})
 
-		
+	for k, v := range m {
+		dataMap[k] = v
+	}
+
+	str, ok := dataMap[name]
+	if !ok {
+		println("rpc name %s not exist", name)
+	}
+
 	
+	if name, ok := na.(string); !ok {
+		println("rpc name is not a string")
+	}
+
+	if args, ok := na.([]interface{}); !ok {
+		println("rpc args is not a array")
+	}
+	
+	
+	if _, err := handle(name, args); err != nil {
+		println("handle func err", err.Error())
+	}
 }
 
 func (s *Server) handle(name string, args []interface{}) ([]byte, error) {
@@ -128,9 +144,9 @@ func (s *Server) handle(name string, args []interface{}) ([]byte, error) {
 		return nil, err
 	}
 
-	s.Lock()
+	mu.Lock()
 	f, ok := s.funcs[name]
-	s.Unlock()
+	mu.Unlock()
 	if !ok {
 		return nil, fmt.Errorf("rpc %s not registered", name)
 	}
