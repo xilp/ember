@@ -118,17 +118,18 @@ func routeTo(w http.ResponseWriter, r *http.Request) {
 		dataMap[k] = v
 	}
 
-	str, ok := dataMap[name]
+	str, ok := dataMap["name"]
 	if !ok {
 		println("rpc name %s not exist", name)
 	}
-
 	
 	if name, ok := na.(string); !ok {
 		println("rpc name is not a string")
 	}
 
-	if args, ok := na.([]interface{}); !ok {
+	array, ok := dataMap["args"]
+
+	if args, ok := array.([]interface{}); !ok {
 		println("rpc args is not a array")
 	}
 	
