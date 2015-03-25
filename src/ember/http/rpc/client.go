@@ -3,6 +3,12 @@ package rpc
 import (
 	"reflect"
 	"sync"
+	"fmt"
+	"encoding/json"
+	"net/http"
+	"net/url"
+	"io/ioutil"
+	"bytes"
 )
 
 type Client struct {
@@ -12,8 +18,6 @@ type Client struct {
 }
 
 func NewClient(url string) *Client {
-	RegisterType(RpcError{})
-
 	c := new(Client)
 	c.url = url
 	
@@ -64,52 +68,37 @@ func (c *Client) makeRpc(rpcName string, fptr interface{}) (err error) {
 }
 
 func (c *Client) call(fn reflect.Value, name string, in []reflect.Value) []reflect.Value {
+	
+
 	inArgs := make([]interface{}, len(in))
 	for i := 0; i < len(in); i++ {
 		inArgs[i] = in[i].Interface()
 	}
 
-	// TODO need Marshal and send request
-
-	in := NewInArgs(name, inArgs)
-	data, err := json.Marshal(group)
+	input := NewInArgs(name, inArgs)
+	data, err := json.Marshal(in)
 	
+	buf, err := bytes.NewReader(data).Read(data)
+	resp, err := http.Post(url + name, "text/json", &buf)
+	if err != nil {
+		return c.returnCallError(fn, err)
+	}
 	
+	dataBytes, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		return c.returnCallError(fn, err)
+	}
 	
-
-	
-	data, err := encodeData(name, inArgs)
+	var f interface{}
+	err = json.Unmarshal(dataBytes, &f)
 	if err != nil {
 		return c.returnCallError(fn, err)
 	}
 
-	var co *conn
-	var buf []byte
-	for i := 0; i < 3; i++ {
-		if co, err = c.popConn(); err != nil {
-			continue
-		}
+	dataMap := f.(map[string]interface{})
 
-		buf, err = co.Call(data)
-		if err == nil {
-			c.pushConn(co)
-			break
-		} else {
-			co.Close()
-		}
-	}
-
-	if err != nil {
-		return c.returnCallError(fn, err)
-	}
-
-	n, out, e := decodeData(buf)
-	if e != nil {
-		return c.returnCallError(fn, e)
-	}
-
-	if n != name {
-		return c.returnCallError(fn, fmt.Errorf("rpc name %s != %s", n, name))
+	if out, ok := dataMap["args"]; !ok {
+		return c.returnCallError(fn, fmt.Errorf("rpc args is nil"))
 	}
 
 	last := out[len(out)-1]
@@ -131,6 +120,8 @@ func (c *Client) call(fn reflect.Value, name string, in []reflect.Value) []refle
 	}
 
 	return outValues
+
+	defer resp.Body.Close()
 }
 
 func (c *Client) returnCallError(fn reflect.Value, err error) []reflect.Value {
@@ -146,15 +137,13 @@ func (c *Client) returnCallError(fn reflect.Value, err error) []reflect.Value {
 
 func NewInArgs(name string, args []interface{}) *InArgs {
 	a := new(InArgs)
-	a.Name := name
-	a.args := args
+	a.Name = name
+	a.args = args
 	return a
-}	
-
-type InArgs struct {
-    Name string `json:"name"`
-    Args []interface{} `json:"args"`
 }
 
+type InArgs struct {
+    	Args []interface{} 	`json:"args"`
+}
 
 

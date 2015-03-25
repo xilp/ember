@@ -7,23 +7,26 @@ import (
 	"io/ioutil"
 )
 
+const (
+	StatusErr = 599
+	ErrOK = "OK"
+) 
+
 type Server struct {
 	mu sync.Mutex
 	
-	network string
 	addr string
 	funcs map[string]reflect.Value
 
-	listener net.Listener
 	running  bool
 	objs interface{}
 }
 
-func NewServer(network, addr string) *Server {
+func NewServer(addr string) *Server {
 	RegisterType(RpcError{})
 
 	s := new(Server)
-	s.mu := &sync.Mutex{} 
+	s.mu = &sync.Mutex{} 
 
 	s.network = network
 	s.addr = addr
@@ -95,56 +98,69 @@ func (s *Server) register(name string, f interface{}) (err error) {
 
 func (s *Server) start() error {
 	http.HandleFunc("/Router", routeTo)
-	return http.ListenAndServe(":" + strconv.Itoa(config.Port), nil)
+	return http.ListenAndServe("localhost", nil)
 }
 
-func routeTo(w http.ResponseWriter, r *http.Request) {
+func (s *Server) routeTo(w http.ResponseWriter, r *http.Request) {
+	var errStr string
+	result, err := doRoute(w, r)
+	if err == nil {
+		errStr = ErrOK
+	} else {
+		errStr = err.Error()
+	}
+		
+	resp := NewResponse(errStr, result)
+	ret, mErr := json.Marshal(resp)
+	if mErr != nil {
+		errStr = "marshal error"
+	}
+	
+	h := w.Header()
+	h.Set("Content-Type", "text/json")
+
+	if err == nil {
+		w.WriteHeader(StatusErr)
+	} else {
+		w.WriteHeader(http.StatusOK)
+	}
+	_, err = w.Write(ret)
+}
+
+func (s *Server) doRoute(w http.ResponseWriter, r *http.Request) (result []interface{}, err error) {
 	defer r.Body.Close()
 	data, err := ioutil.ReadAll(r.Body)
 	if err != nil {
-		println("read body error", err.Error())
+		return
 	}
 	
-	var f = &interface{}
-	err := json.Unmarshal(data, f)
+	var f interface{}
+	err = json.Unmarshal(data, &f)
 	if err != nil {
-		println("unmarshal err", err.Error())
+		return
 	}
 
-	m := f.(map[string]interface{})
-	dataMap := make(map[string]interface{})
-
-	for k, v := range m {
-		dataMap[k] = v
+	if dataMap, ok := f.(map[string]interface{}); !ok {
+		err = fmt.Errorf("data structure type not match")
+		return
 	}
 
-	str, ok := dataMap["name"]
-	if !ok {
-		println("rpc name %s not exist", name)
-	}
-	
-	if name, ok := na.(string); !ok {
-		println("rpc name is not a string")
+	name := r.URL.Path
+	if name == nil {
+		err = fmt.Errorf("rpc name is null")	
+		return 
 	}
 
 	array, ok := dataMap["args"]
-
 	if args, ok := array.([]interface{}); !ok {
-		println("rpc args is not a array")
+		err = fmt.Errorf("data structure type not match")
+		return
 	}
 	
-	
-	if _, err := handle(name, args); err != nil {
-		println("handle func err", err.Error())
-	}
+	return s.handle(name, args);
 }
 
-func (s *Server) handle(name string, args []interface{}) ([]byte, error) {
-	name, args, err := decodeData(data)
-	if err != nil {
-		return nil, err
-	}
-
+func (s *Server) handle(name string, args []interface{}) ([]interface{}, error) {
 	mu.Lock()
 	f, ok := s.funcs[name]
 	mu.Unlock()
@@ -161,7 +177,6 @@ func (s *Server) handle(name string, args []interface{}) ([]byte, error) {
 		} else {
 			inValues[i + 1] = reflect.ValueOf(args[i])
 		}
-		
 	}
 
 	out := f.Call(inValues)
@@ -180,17 +195,30 @@ func (s *Server) handle(name string, args []interface{}) ([]byte, error) {
 		}
 	}
 
-	return encodeData(name, outArgs)
+	return outArgs, nil
 }
 
-type Config struct {
+func NewData(name string, args []interface{}) *Data {
+	d := new(Data)
+	d.Name = name
+	d.Args = args
+	return d 	
+}
+
+func NewResponse(err string, result []byte) *Response {
+	r := new(Response)
+	r.Err = err
+	r.Result = result
+	return r
+}	
+
+type Data struct {
 	Name string `json:"name"`
 	Args []interface{} `json:"args"`
 }
 
-
-
-
-
-
+type Response struct {
+	Err string	`json:"err"`
+	Result []interface{}	`json:"result"`
+}
 
