@@ -1,7 +1,6 @@
 package rpc
 
 import (
-	"errors"
 	"sync"
 	"testing"
 	"time"
@@ -15,7 +14,7 @@ var testClient *Client
 
 func newTestServer() *Server {
 	f := func() {
-		testServer = NewServer("http://127.0.0.1:11182/")
+		testServer = NewServer("Router")
 		go testServer.Run()
 	}
 
@@ -50,7 +49,7 @@ func TestRpc0(t *testing.T) {
 
 	s := newTestServer()
 	s.RegisterObj(&a)
-	time.Sleep(time.Second)
+	time.Sleep(time.Second * 1)
 
 	c := newTestClient()
 	
@@ -71,8 +70,6 @@ func TestRpc0(t *testing.T) {
 	}
 	println("-------------------- E")
 
-	//if _, err := b.Add(10, 1); err != nil {
-	//	t.Fatal(err)
-	//}
+
 }
 

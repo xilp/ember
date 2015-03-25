@@ -162,10 +162,12 @@ func (s *Server) handle(data []byte) ([]byte, error) {
 		return nil, fmt.Errorf("rpc %s not registered", name)
 	}
 
+	
 	inValues := make([]reflect.Value, len(args) + 1)
 	inValues[0] = reflect.ValueOf(s.obj)
 
 	for i := 0; i < len(args); i++ {
+		
 		if args[i] == nil {
 			inValues[i + 1] = reflect.Zero(f.Type().In(i))
 		} else {

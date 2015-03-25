@@ -6,9 +6,9 @@ import (
 	"fmt"
 	"encoding/json"
 	"net/http"
-	"net/url"
 	"io/ioutil"
 	"bytes"
+	"time"
 )
 
 type Client struct {
@@ -68,38 +68,43 @@ func (c *Client) makeRpc(rpcName string, fptr interface{}) (err error) {
 }
 
 func (c *Client) call(fn reflect.Value, name string, in []reflect.Value) []reflect.Value {
-	
 
 	inArgs := make([]interface{}, len(in))
 	for i := 0; i < len(in); i++ {
-		inArgs[i] = in[i].Interface()
+		//inArgs[i] = in[i].Interface()
+		inArgs[i] = reflect.ValueOf(in[i].Interface()).Int()
 	}
 
-	input := NewInArgs(name, inArgs)
-	data, err := json.Marshal(in)
-	
-	buf, err := bytes.NewReader(data).Read(data)
-	resp, err := http.Post(url + name, "text/json", &buf)
+	input := NewInArgs(inArgs)
+	data, err := json.Marshal(input)
+
+	resp, err := http.Post(c.url + "Router", "text/json", bytes.NewReader(data))
 	if err != nil {
-		return c.returnCallError(fn, err)
+		println(err.Error())
 	}
-	
+
 	dataBytes, err := ioutil.ReadAll(resp.Body)
+
+	time.Sleep(time.Second * 5)
 	if err != nil {
 		return c.returnCallError(fn, err)
 	}
 	
 	var f interface{}
-	err = json.Unmarshal(dataBytes, &f)
-	if err != nil {
-		return c.returnCallError(fn, err)
+	errs := json.Unmarshal(dataBytes, &f)
+	if errs != nil {
+	println(errs.Error())
+		return c.returnCallError(fn, errs)
 	}
-
+	//TODO
+	
 	dataMap := f.(map[string]interface{})
-
-	if out, ok := dataMap["args"]; !ok {
+	iout, ok := dataMap["args"];
+	if !ok {
 		return c.returnCallError(fn, fmt.Errorf("rpc args is nil"))
 	}
+	
+	out, ok := iout.([]interface{})
 
 	last := out[len(out)-1]
 	if last != nil {
@@ -118,10 +123,8 @@ func (c *Client) call(fn reflect.Value, name string, in []reflect.Value) []refle
 			outValues[i] = reflect.ValueOf(out[i])
 		}
 	}
-
-	return outValues
-
 	defer resp.Body.Close()
+	return outValues	
 }
 
 func (c *Client) returnCallError(fn reflect.Value, err error) []reflect.Value {
@@ -135,10 +138,9 @@ func (c *Client) returnCallError(fn reflect.Value, err error) []reflect.Value {
 	return out
 }
 
-func NewInArgs(name string, args []interface{}) *InArgs {
+func NewInArgs(args []interface{}) *InArgs {
 	a := new(InArgs)
-	a.Name = name
-	a.args = args
+	a.Args = args
 	return a
 }
 

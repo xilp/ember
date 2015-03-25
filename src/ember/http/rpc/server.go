@@ -5,6 +5,8 @@ import (
 	"sync"
 	"net/http"
 	"io/ioutil"
+	"fmt"
+	"encoding/json"
 )
 
 const (
@@ -13,22 +15,17 @@ const (
 ) 
 
 type Server struct {
-	mu sync.Mutex
+	sync.Mutex
 	
 	addr string
 	funcs map[string]reflect.Value
 
 	running  bool
-	objs interface{}
+	obj interface{}
 }
 
 func NewServer(addr string) *Server {
-	RegisterType(RpcError{})
-
 	s := new(Server)
-	s.mu = &sync.Mutex{} 
-
-	s.network = network
 	s.addr = addr
 
 	s.funcs = make(map[string]reflect.Value)
@@ -41,7 +38,7 @@ func (s *Server) Run() error {
 	if err != nil {
 		return err
 	}
-
+	
 	return nil
 }
 
@@ -50,7 +47,7 @@ func (s *Server) RegisterObj(obj interface{}) (err error) {
 	for i := 0; i < typ.NumMethod(); i++ {
 		method := typ.Method(i)
 		mname := method.Name
-		err = s.Register(mname, method.Func.Interface())		
+		err = s.register(mname, method.Func.Interface())		
 		if err != nil {
 			return
 		}
@@ -84,26 +81,28 @@ func (s *Server) register(name string, f interface{}) (err error) {
 		return
 	}
 
-	mu.Lock()
+	s.Lock()
 	if _, ok := s.funcs[name]; ok {
 		err = fmt.Errorf("%s has registered", name)
-		mu.Unlock()
+		s.Unlock()
 		return
 	}
 
 	s.funcs[name] = v
-	mu.Unlock()
+	s.Unlock()
 	return
 }
 
 func (s *Server) start() error {
-	http.HandleFunc("/Router", routeTo)
-	return http.ListenAndServe("localhost", nil)
+	println("Server.Start")
+	http.HandleFunc("/Router", s.routeTo)
+	return http.ListenAndServe(":11182", nil)
 }
 
 func (s *Server) routeTo(w http.ResponseWriter, r *http.Request) {
+	println("hahahahahahahahha")
 	var errStr string
-	result, err := doRoute(w, r)
+	result, err := s.doRoute(w, r)
 	if err == nil {
 		errStr = ErrOK
 	} else {
@@ -120,9 +119,9 @@ func (s *Server) routeTo(w http.ResponseWriter, r *http.Request) {
 	h.Set("Content-Type", "text/json")
 
 	if err == nil {
-		w.WriteHeader(StatusErr)
-	} else {
 		w.WriteHeader(http.StatusOK)
+	} else {
+		w.WriteHeader(StatusErr)
 	}
 	_, err = w.Write(ret)
 }
@@ -140,19 +139,17 @@ func (s *Server) doRoute(w http.ResponseWriter, r *http.Request) (result []inter
 		return
 	}
 
-	if dataMap, ok := f.(map[string]interface{}); !ok {
+	dataMap, ok := f.(map[string]interface{});
+	if !ok {
 		err = fmt.Errorf("data structure type not match")
 		return
 	}
 
-	name := r.URL.Path
-	if name == nil {
-		err = fmt.Errorf("rpc name is null")	
-		return 
-	}
-
+	//name := r.URL.Path
+	name := "Larger"
 	array, ok := dataMap["args"]
-	if args, ok := array.([]interface{}); !ok {
+	args, ok := array.([]interface{});
+	if !ok {
 		err = fmt.Errorf("data structure type not match")
 		return
 	}
@@ -161,20 +158,22 @@ func (s *Server) doRoute(w http.ResponseWriter, r *http.Request) (result []inter
 }
 
 func (s *Server) handle(name string, args []interface{}) ([]interface{}, error) {
-	mu.Lock()
+	s.Lock()
 	f, ok := s.funcs[name]
-	mu.Unlock()
+	s.Unlock()
 	if !ok {
 		return nil, fmt.Errorf("rpc %s not registered", name)
 	}
-
+	
 	inValues := make([]reflect.Value, len(args) + 1)
 	inValues[0] = reflect.ValueOf(s.obj)
 
 	for i := 0; i < len(args); i++ {
+		
 		if args[i] == nil {
 			inValues[i + 1] = reflect.Zero(f.Type().In(i))
 		} else {
+			
 			inValues[i + 1] = reflect.ValueOf(args[i])
 		}
 	}
@@ -205,7 +204,7 @@ func NewData(name string, args []interface{}) *Data {
 	return d 	
 }
 
-func NewResponse(err string, result []byte) *Response {
+func NewResponse(err string, result []interface{}) *Response {
 	r := new(Response)
 	r.Err = err
 	r.Result = result
@@ -222,3 +221,10 @@ type Response struct {
 	Result []interface{}	`json:"result"`
 }
 
+type RpcError struct {
+	Message string
+}
+
+func (r RpcError) Error() string {
+	return r.Message
+}
