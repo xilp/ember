@@ -1,1 +1,4 @@
 export GOPATH=$GOPATH:$(pwd)
+
+
+
