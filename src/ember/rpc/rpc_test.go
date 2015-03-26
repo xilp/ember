@@ -152,27 +152,29 @@ func TestRpc0(t *testing.T) {
 	time.Sleep(time.Second)
 
 	c := newTestClient()
-	
+
 	type B struct {
-		Larger func(a, b int)(bool, error)	
-		Add func(a, b int)(int, error)	
+		Larger func(a, b int)(bool, error)
+		Add func(a, b int)(int, error)
 	}
 	var b B
 
 	if err := c.MakeRpcObj(&b); err != nil {
 		t.Fatal(err)
 	}
-	
 
-
-	if larger, err := b.Larger(10, 1); err != nil {
+	if adder, err := b.Add(10, 1); err != nil {
 		t.Fatal(err)
 	} else {
-		println(larger)	
+		println(adder)
 	}
-	println("-------------------- E")
 
-	//if _, err := b.Add(10, 1); err != nil {
+	return
+	//if larger, err := b.Larger(10, 1); err != nil {
 	//	t.Fatal(err)
+	//} else {
+	//	println(larger)
 	//}
+
+	println("-------------------- E")
 }

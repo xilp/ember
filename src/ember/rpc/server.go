@@ -16,7 +16,7 @@ type Server struct {
 
 	listener net.Listener
 	running  bool
-	
+
 	obj interface{}
 }
 
@@ -28,7 +28,6 @@ func NewServer(network, addr string) *Server {
 	s.addr = addr
 
 	s.funcs = make(map[string]reflect.Value)
-
 	return s
 }
 
@@ -67,14 +66,14 @@ func (s *Server) RegisterObj(obj interface{}) (err error) {
 	for i := 0; i < typ.NumMethod(); i++ {
 		method := typ.Method(i)
 		mname := method.Name
-		err = s.Register(mname, method.Func.Interface())		
+		err = s.Register(mname, method.Func.Interface())
 		if err != nil {
 			return
 		}
 	}
 
 	s.obj = obj
-	return	
+	return
 }
 
 func (s *Server) Register(name string, f interface{}) (err error) {
