@@ -30,6 +30,9 @@ func (c *Client) MakeRpcObj(obj interface{}) (err error) {
 		name := structField.Name
 		field := val.Field(i)
 		err = c.makeRpc(name, field.Addr().Interface())
+		if err != nil {
+			return
+		}
 	}
 	return
 }
