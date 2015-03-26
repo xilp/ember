@@ -7,19 +7,18 @@ import (
 	"io/ioutil"
 	"fmt"
 	"encoding/json"
+	"strings"
 )
 
 const (
 	StatusErr = 599
 	ErrOK = "OK"
-) 
+)
 
 type Server struct {
 	sync.Mutex
-	
 	addr string
 	funcs map[string]reflect.Value
-
 	running  bool
 	obj interface{}
 }
@@ -27,9 +26,7 @@ type Server struct {
 func NewServer(addr string) *Server {
 	s := new(Server)
 	s.addr = addr
-
 	s.funcs = make(map[string]reflect.Value)
-	
 	return s
 }
 
@@ -38,7 +35,6 @@ func (s *Server) Run() error {
 	if err != nil {
 		return err
 	}
-	
 	return nil
 }
 
@@ -47,14 +43,14 @@ func (s *Server) RegisterObj(obj interface{}) (err error) {
 	for i := 0; i < typ.NumMethod(); i++ {
 		method := typ.Method(i)
 		mname := method.Name
-		err = s.register(mname, method.Func.Interface())		
+		err = s.register(mname, method.Func.Interface())
 		if err != nil {
 			return
 		}
 	}
 
 	s.obj = obj
-	return	
+	return
 }
 
 func (s *Server) register(name string, f interface{}) (err error) {
@@ -89,18 +85,19 @@ func (s *Server) register(name string, f interface{}) (err error) {
 	}
 
 	s.funcs[name] = v
+	println(name)
 	s.Unlock()
 	return
 }
 
 func (s *Server) start() error {
 	println("Server.Start")
-	http.HandleFunc("/Router", s.routeTo)
+	http.HandleFunc("/", s.routeTo)
 	return http.ListenAndServe(":11182", nil)
 }
 
 func (s *Server) routeTo(w http.ResponseWriter, r *http.Request) {
-	println("hahahahahahahahha")
+	println("routeTo")
 	var errStr string
 	result, err := s.doRoute(w, r)
 	if err == nil {
@@ -108,13 +105,13 @@ func (s *Server) routeTo(w http.ResponseWriter, r *http.Request) {
 	} else {
 		errStr = err.Error()
 	}
-		
+
 	resp := NewResponse(errStr, result)
 	ret, mErr := json.Marshal(resp)
 	if mErr != nil {
 		errStr = "marshal error"
 	}
-	
+
 	h := w.Header()
 	h.Set("Content-Type", "text/json")
 
@@ -132,49 +129,47 @@ func (s *Server) doRoute(w http.ResponseWriter, r *http.Request) (result []inter
 	if err != nil {
 		return
 	}
-	
-	var f interface{}
+
+	var f struct {
+		Args []json.RawMessage
+	}
 	err = json.Unmarshal(data, &f)
 	if err != nil {
 		return
 	}
 
-	dataMap, ok := f.(map[string]interface{});
-	if !ok {
-		err = fmt.Errorf("data structure type not match")
-		return
-	}
-
-	//name := r.URL.Path
-	name := "Larger"
-	array, ok := dataMap["args"]
-	args, ok := array.([]interface{});
-	if !ok {
-		err = fmt.Errorf("data structure type not match")
-		return
-	}
-	
-	return s.handle(name, args);
+	name := strings.TrimLeft(r.URL.Path, "/")	
+	return s.handle(name, f.Args);
 }
 
-func (s *Server) handle(name string, args []interface{}) ([]interface{}, error) {
+func (s *Server) handle(name string, args []json.RawMessage) ([]interface{}, error) {
 	s.Lock()
 	f, ok := s.funcs[name]
 	s.Unlock()
+	
 	if !ok {
 		return nil, fmt.Errorf("rpc %s not registered", name)
 	}
 	
-	inValues := make([]reflect.Value, len(args) + 1)
-	inValues[0] = reflect.ValueOf(s.obj)
+	if len(args) + 1 != f.Type().NumIn() {
+		return nil, fmt.Errorf("rpc %s params count unmatched", name)	
+	}
 
-	for i := 0; i < len(args); i++ {
+	inValues := make([]reflect.Value, len(args) + 1)
+	inValues[0] = reflect.ValueOf(s.obj)	
+
+	for i := 1; i <= len(args); i++ {
 		
-		if args[i] == nil {
-			inValues[i + 1] = reflect.Zero(f.Type().In(i))
+		if args[i - 1] == nil {
+			inValues[i] = reflect.Zero(f.Type().In(i))
 		} else {
-			
-			inValues[i + 1] = reflect.ValueOf(args[i])
+			typ := f.Type().In(i)
+			newVal := reflect.New(typ)
+			err := json.Unmarshal(args[i - 1], newVal.Interface())
+			if err != nil {
+				panic("FXXX")			
+			}			
+			inValues[i] = newVal.Elem()
 		}
 	}
 

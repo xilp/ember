@@ -44,7 +44,6 @@ func (p *Integer) Add(a, b int) (int, error) {
 }
 
 func TestRpc0(t *testing.T) {
-	println("-------------------- B")
 	var a Integer
 
 	s := newTestServer()
@@ -62,14 +61,11 @@ func TestRpc0(t *testing.T) {
 	if err := c.MakeRpcObj(&b); err != nil {
 		t.Fatal(err)
 	}
-	
-	if larger, err := b.Larger(10, 1); err != nil {
-		t.Fatal(err)
+
+	if adder, err := b.Add(100, 100); err != nil {
+		println(err, "XXX")
 	} else {
-		println(larger)	
+		println(adder)
 	}
-	println("-------------------- E")
-
-
 }
 
