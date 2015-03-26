@@ -15,11 +15,9 @@ var testClient *Client
 func newTestServer() *Server {
 	f := func() {
 		testServer = NewServer("Router")
-		go testServer.Run()
+		go testServer.Run(11182)
 	}
-
 	testServerOnce.Do(f)
-
 	return testServer
 }
 
@@ -27,9 +25,7 @@ func newTestClient() *Client {
 	f := func() {
 		testClient = NewClient("http://127.0.0.1:11182/")
 	}
-
 	testClientOnce.Do(f)
-
 	return testClient
 }
 
@@ -43,12 +39,12 @@ func (p *Integer) Add(a, b int) (int, error) {
 	return a + b, nil
 }
 
-func TestRpc0(t *testing.T) {
+func TestRpc(t *testing.T) {
 	var a Integer
 
 	s := newTestServer()
-	s.RegisterObj(&a)
-	time.Sleep(time.Second * 1)
+	s.Register(&a)
+	time.Sleep(time.Millisecond)
 
 	c := newTestClient()
 	
@@ -58,14 +54,15 @@ func TestRpc0(t *testing.T) {
 	}
 	var b B
 
-	if err := c.MakeRpcObj(&b); err != nil {
+	if err := c.MakeRpc(&b); err != nil {
 		t.Fatal(err)
 	}
 
-	if adder, err := b.Add(100, 100); err != nil {
-		println(err, "XXX")
-	} else {
-		println(adder)
+	ret, err := b.Add(100, 10)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if ret != 110 {
+		t.Fatal(err)
 	}
 }
-

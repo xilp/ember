@@ -1,14 +1,14 @@
 package rpc
 
 import (
+	"bytes"
+	"errors"
+	"encoding/json"
+	"fmt"
+	"io/ioutil"
+	"net/http"
 	"reflect"
 	"sync"
-	"fmt"
-	"encoding/json"
-	"net/http"
-	"io/ioutil"
-	"bytes"
-	"time"
 )
 
 type Client struct {
@@ -17,19 +17,17 @@ type Client struct {
 }
 
 func NewClient(url string) *Client {
-	c := new(Client)
-	c.url = url
-	return c
+	return &Client{url: url}
 }
 
-func (c *Client) MakeRpcObj(obj interface{}) (err error) {
+func (p *Client) MakeRpc(obj interface{}) (err error) {
 	typ := reflect.TypeOf(obj).Elem()
 	for i := 0; i < typ.NumField(); i++ {
 		val := reflect.ValueOf(obj).Elem()
 		structField := typ.Field(i)
 		name := structField.Name
 		field := val.Field(i)
-		err = c.makeRpc(name, field.Addr().Interface())
+		err = p.create(name, field.Addr().Interface())
 		if err != nil {
 			return
 		}
@@ -37,14 +35,14 @@ func (c *Client) MakeRpcObj(obj interface{}) (err error) {
 	return
 }
 
-func (c *Client) makeRpc(rpcName string, fptr interface{}) (err error) {
+func (p *Client) create(name string, fptr interface{}) (err error) {
 	defer func() {
 		e := recover()
 		if e != nil {
-			if _, ok := e.(error); ok {
-				err = fmt.Errorf("make rpc error", e.(error).Error())
+			if r, ok := e.(error); ok {
+				err = r
 			} else {
-				err = fmt.Errorf("make rpc error", e.(string))
+				err = errors.New(e.(string))
 			}
 		}
 	}()
@@ -53,78 +51,79 @@ func (c *Client) makeRpc(rpcName string, fptr interface{}) (err error) {
 
 	nOut := fn.Type().NumOut();
 	if nOut == 0 || fn.Type().Out(nOut - 1).Kind() != reflect.Interface {
-		err = fmt.Errorf("%s return final output param must be error interface", rpcName)
+		err = fmt.Errorf("%s return final output param must be error interface", name)
 		return
 	}
 
-	_, b := fn.Type().Out(nOut - 1).MethodByName("Error")
-	if !b {
-		err = fmt.Errorf("%s return final output param must be error interface", rpcName)
+	_, ok := fn.Type().Out(nOut - 1).MethodByName("Error")
+	if !ok {
+		err = fmt.Errorf("%s return final output param must be error interface", name)
 		return
 	}
 
-	f := func(in []reflect.Value) []reflect.Value {
-		return c.call(fn, rpcName, in)
+	fun := func(in []reflect.Value) []reflect.Value {
+		return p.call(fn, name, in)
 	}
 
-	v := reflect.MakeFunc(fn.Type(), f)
-	fn.Set(v)
+	fv := reflect.MakeFunc(fn.Type(), fun)
+	fn.Set(fv)
 	return
 }
 
-func (c *Client) call(fn reflect.Value, name string, in []reflect.Value) []reflect.Value {
-	inArgs := make([]interface{}, len(in))
+func (p *Client) call(fn reflect.Value, name string, in []reflect.Value) []reflect.Value {
+	args := make([]interface{}, len(in))
 	for i := 0; i < len(in); i++ {
-		inArgs[i] = in[i].Interface()
+		args[i] = in[i].Interface()
 	}
 
-	input := NewInArgs(inArgs)
-	data, err := json.Marshal(input)
-
-	resp, err := http.Post(c.url + name, "text/json", bytes.NewReader(data))
+	inJson := NewInArgs(args)
+	inData, err := json.Marshal(inJson)
 	if err != nil {
-		println(err.Error())
+		return p.returnCallError(fn, err)
 	}
 
-	dataBytes, err := ioutil.ReadAll(resp.Body)
-
-	time.Sleep(time.Second * 3)
+	resp, err := http.Post(p.url + name, "text/json", bytes.NewReader(inData))
 	if err != nil {
-		return c.returnCallError(fn, err)
+		return p.returnCallError(fn, err)
 	}
 
-	var f struct {
+	defer resp.Body.Close()
+	outData, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		return p.returnCallError(fn, err)
+	}
+
+	var outJson struct {
 		Result []json.RawMessage
 	}
 
-	errs := json.Unmarshal(dataBytes, &f)
-	if errs != nil {
-		return c.returnCallError(fn, errs)
+	err = json.Unmarshal(outData, &outJson)
+	if err != nil {
+		return p.returnCallError(fn, err)
 	}
 
-	outValues := make([]reflect.Value, len(f.Result))
-	for i := 0; i < len(f.Result); i++ {
-		if f.Result[i] == nil {
-			outValues[i] = reflect.Zero(fn.Type().Out(i))
+	out := make([]reflect.Value, len(outJson.Result))
+	for i := 0; i < len(outJson.Result); i++ {
+		if outJson.Result[i] == nil {
+			out[i] = reflect.Zero(fn.Type().Out(i))
 		} else {
 			typ := fn.Type().Out(i)
-			newVal := reflect.New(typ)
-			err := json.Unmarshal(f.Result[i], newVal.Interface())
+			val := reflect.New(typ)
+			err = json.Unmarshal(outJson.Result[i], val.Interface())
 			if err != nil {
-				panic("FXXX")
+				return p.returnCallError(fn, err)
 			}
-			outValues[i] = newVal.Elem()
-
+			out[i] = val.Elem()
 		}
 	}
-	defer resp.Body.Close()
-	return outValues
+
+	return out
 }
 
 func (c *Client) returnCallError(fn reflect.Value, err error) []reflect.Value {
 	nOut := fn.Type().NumOut()
 	out := make([]reflect.Value, nOut)
-	for i := 0; i < nOut-1; i++ {
+	for i := 0; i < nOut - 1; i++ {
 		out[i] = reflect.Zero(fn.Type().Out(i))
 	}
 
@@ -133,9 +132,7 @@ func (c *Client) returnCallError(fn reflect.Value, err error) []reflect.Value {
 }
 
 func NewInArgs(args []interface{}) *InArgs {
-	a := new(InArgs)
-	a.Args = args
-	return a
+	return &InArgs{args}
 }
 
 type InArgs struct {
