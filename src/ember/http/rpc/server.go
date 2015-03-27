@@ -32,15 +32,13 @@ func (p *ErrRpcServer) Error() string {
 }
 
 type Server struct {
-	addr string
 	funcs map[string]reflect.Value
 	objs map[string]interface{}
 	sync.Mutex
 }
 
-func NewServer(addr string) *Server {
+func NewServer() *Server {
 	return &Server {
-		addr: addr,
 		funcs: make(map[string]reflect.Value),
 		objs: make(map[string]interface{}),
 	}
