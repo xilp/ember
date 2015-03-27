@@ -221,6 +221,7 @@ type Response struct {
 }
 
 func callable(fun reflect.Value) (is bool) {
+	is = true
 	defer func() {
 		if e := recover(); e != nil {
 			is = false
@@ -228,7 +229,7 @@ func callable(fun reflect.Value) (is bool) {
 		}
 	}()
 	fun.Type().NumIn()
-	return true
+	return
 }
 
 func call(fun reflect.Value, in []reflect.Value) (out []reflect.Value, err error) {
