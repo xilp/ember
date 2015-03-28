@@ -14,7 +14,7 @@ var testClient *Client
 
 func newTestServer() *Server {
 	f := func() {
-		testServer = NewServer("Router")
+		testServer = NewServer()
 		go testServer.Run(11182)
 	}
 	testServerOnce.Do(f)

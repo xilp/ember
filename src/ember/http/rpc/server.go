@@ -19,6 +19,8 @@ const (
 	HttpCodeErr = 599
 )
 
+var ErrUnknown = errors.New("unknown error type on call api")
+
 type ErrRpcServer struct {
 	err error
 }
@@ -32,15 +34,13 @@ func (p *ErrRpcServer) Error() string {
 }
 
 type Server struct {
-	addr string
 	funcs map[string]reflect.Value
 	objs map[string]interface{}
 	sync.Mutex
 }
 
-func NewServer(addr string) *Server {
+func NewServer() *Server {
 	return &Server {
-		addr: addr,
 		funcs: make(map[string]reflect.Value),
 		objs: make(map[string]interface{}),
 	}
@@ -66,8 +66,9 @@ func (p *Server) Register(obj interface{}) (err error) {
 func (p *Server) register(name string, obj interface{}, fun interface{}) (err error) {
 	fv := reflect.ValueOf(fun)
 
-	if callable(fv) {
-		err = NewErrRpcServer(fmt.Errorf("%s is not callable", name))
+	err = callable(fv)
+	if err != nil {
+		return
 	}
 
 	nOut := fv.Type().NumOut()
@@ -220,12 +221,16 @@ type Response struct {
 	Result []interface{}
 }
 
-func callable(fun reflect.Value) (is bool) {
-	is = true
+func callable(fun reflect.Value) (err error) {
 	defer func() {
 		if e := recover(); e != nil {
-			is = false
-			return
+			if r, ok := e.(error); ok {
+				err = r
+			} else if s, ok := e.(string); ok {
+				err = NewErrRpcServer(errors.New(s))
+			} else {
+				err =NewErrRpcServer(ErrUnknown)
+			}
 		}
 	}()
 	fun.Type().NumIn()
