@@ -8,16 +8,14 @@ import (
 	"io/ioutil"
 	"net/http"
 	"reflect"
-	"sync"
 )
 
 type Client struct {
-	sync.Mutex
 	url string
 }
 
 func NewClient(url string) *Client {
-	return &Client{url: url}
+	return &Client{url: url + "/"}
 }
 
 func (p *Client) MakeRpc(obj interface{}) (err error) {
@@ -94,6 +92,8 @@ func (p *Client) call(fn reflect.Value, name string, in []reflect.Value) []refle
 	}
 
 	var outJson struct {
+		Status string
+		Detail string
 		Result []json.RawMessage
 	}
 
@@ -102,9 +102,13 @@ func (p *Client) call(fn reflect.Value, name string, in []reflect.Value) []refle
 		return p.returnCallError(fn, err)
 	}
 
-	out := make([]reflect.Value, len(outJson.Result))
-	for i := 0; i < len(outJson.Result); i++ {
-		if outJson.Result[i] == nil {
+	if outJson.Status != StatusOK {
+		return p.returnCallError(fn, errors.New(outJson.Detail))
+	}
+
+	out := make([]reflect.Value, fn.Type().NumOut())
+	for i := 0; i < len(out); i++ {
+		if len(outJson.Result) <= i || outJson.Result[i] == nil {
 			out[i] = reflect.Zero(fn.Type().Out(i))
 		} else {
 			typ := fn.Type().Out(i)
@@ -136,5 +140,5 @@ func NewInArgs(args []interface{}) *InArgs {
 }
 
 type InArgs struct {
-	Args []interface{}
+	Args []interface{} `json:"args"`
 }

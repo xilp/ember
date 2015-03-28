@@ -23,7 +23,7 @@ func newTestServer() *Server {
 
 func newTestClient() *Client {
 	f := func() {
-		testClient = NewClient("http://127.0.0.1:11182/")
+		testClient = NewClient("http://127.0.0.1:11182")
 	}
 	testClientOnce.Do(f)
 	return testClient
