@@ -99,7 +99,7 @@ func (p *Server) register(name string, obj interface{}, fun interface{}) (err er
 func (p *Server) router(w http.ResponseWriter, r *http.Request) {
 	var status string
 	var detail string
-	result, err := p.invoke(w, r)
+	result, err := p.handle(w, r)
 	if err == nil {
 		status = StatusOK
 	} else {
@@ -134,7 +134,7 @@ func (p *Server) router(w http.ResponseWriter, r *http.Request) {
 	// TODO: log here
 }
 
-func (p *Server) invoke(w http.ResponseWriter, r *http.Request) (result []interface{}, err error) {
+func (p *Server) handle(w http.ResponseWriter, r *http.Request) (result []interface{}, err error) {
 	defer r.Body.Close()
 	data, err := ioutil.ReadAll(r.Body)
 	if err != nil {
@@ -150,10 +150,10 @@ func (p *Server) invoke(w http.ResponseWriter, r *http.Request) (result []interf
 	}
 
 	name := strings.TrimLeft(r.URL.Path, "/")
-	return p.handle(name, in.Args)
+	return p.invoke(name, in.Args)
 }
 
-func (p *Server) handle(name string, args []json.RawMessage) (ret []interface{}, err error) {
+func (p *Server) invoke(name string, args []json.RawMessage) (ret []interface{}, err error) {
 	p.Lock()
 	fun, ok := p.funcs[name]
 	p.Unlock()
@@ -216,9 +216,9 @@ func NewResponse(status, detail string, result []interface{}) *Response {
 }
 
 type Response struct {
-	Status string
-	Detail string
-	Result []interface{}
+	Status string `json:"status"`
+	Detail string `json:"detail"`
+	Result []interface{} `json:"result"`
 }
 
 func callable(fun reflect.Value) (err error) {
