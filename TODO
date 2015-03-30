@@ -1,0 +1,9 @@
+cli: call by json
+
+c/s: args[] => args{}
+
+rpc.client:
+	obj := struct {
+		[]intercae{}
+	}
+	clientReg(obj)

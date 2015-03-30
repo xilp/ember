@@ -68,6 +68,10 @@ func (p *Client) create(name string, fptr interface{}) (err error) {
 	return
 }
 
+func (p *Client) Call(name string, args string) []interface{} {
+	return nil
+}
+
 func (p *Client) call(fn reflect.Value, name string, in []reflect.Value) []reflect.Value {
 	args := make([]interface{}, len(in))
 	for i := 0; i < len(in); i++ {
