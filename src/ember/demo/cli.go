@@ -10,6 +10,11 @@ import (
 
 func main() {
 	args := os.Args[1:]
+	if len(args) == 0 {
+		cli.Errln("usage: [-host=] [-port=] cmd")
+		os.Exit(1)
+	}
+
 	host, args := cli.PopArg("host", "127.0.0.1", args)
 	port, args := cli.PopArg("port", "8080", args)
 
