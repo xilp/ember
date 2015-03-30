@@ -1,7 +1,7 @@
 package main
 
 import (
-	"errors"
+	"flag"
 	"fmt"
 	"os"
 	"strconv"
@@ -32,18 +32,21 @@ func CmdRun(args []string) {
 }
 
 func (p *Client) CmdEcho(args []string) {
-	if len(args) != 1 {
-		cli.Check(errors.New("echo msg: unmatched args count"))
-	}
-	msg, err := p.Echo(args[0])
+	flag := flag.NewFlagSet("echo", flag.PanicOnError)
+	msg := flag.String("msg", "", "message to be sent to server")
+	cli.ParseFlag(flag, args, "msg")
+
+	echo, err := p.Echo(*msg)
 	cli.Check(err)
-	fmt.Println(msg)
+	fmt.Println(echo)
 }
 
 func (p *Client) CmdPanic(args []string) {
+	cli.ParseFlag(flag.NewFlagSet("panic", flag.PanicOnError), args)
 	cli.Check(p.Panic())
 }
 
 func (p *Client) CmdStop(args []string) {
+	cli.ParseFlag(flag.NewFlagSet("panic", flag.PanicOnError), args)
 	cli.Check(p.Stop())
 }

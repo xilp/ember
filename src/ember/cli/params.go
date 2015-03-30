@@ -45,8 +45,12 @@ func ParseFlag(flag *flag.FlagSet, args []string, flags ...string) {
 	}
 
 	if len(args) > 0 && (args[len(args) - 1] == "help" || args[len(args) - 1] == "?") {
-		flag.PrintDefaults()
-		display()
+		if ArgsCount(flag) == 0 {
+			fmt.Println("no args need")
+		} else {
+			flag.PrintDefaults()
+			display()
+		}
 		os.Exit(1)
 	}
 
@@ -56,4 +60,11 @@ func ParseFlag(flag *flag.FlagSet, args []string, flags ...string) {
 		display()
 		os.Exit(1)
 	}
+}
+
+func ArgsCount(fs *flag.FlagSet) (count int) {
+	fs.VisitAll(func(it *flag.Flag) {
+		count += 1
+	})
+	return
 }
