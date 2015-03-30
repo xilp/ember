@@ -1,9 +1,10 @@
 package cli
 
 import (
-	"os"
 	"flag"
 	"fmt"
+	"os"
+	"strings"
 )
 
 func AutoComplete(args []string, flags ...string) []string {
@@ -36,6 +37,13 @@ func AutoComplete(args []string, flags ...string) []string {
 
 func ParseFlag(flag *flag.FlagSet, args []string, flags ...string) {
 	display := func() {
+		if ArgsCount(flag) == 0 {
+			fmt.Println("no args need")
+			return
+		}
+
+		flag.PrintDefaults()
+
 		fmt.Println()
 		fmt.Print("shortcut:")
 		for _, it := range flags {
@@ -45,12 +53,7 @@ func ParseFlag(flag *flag.FlagSet, args []string, flags ...string) {
 	}
 
 	if len(args) > 0 && (args[len(args) - 1] == "help" || args[len(args) - 1] == "?") {
-		if ArgsCount(flag) == 0 {
-			fmt.Println("no args need")
-		} else {
-			flag.PrintDefaults()
-			display()
-		}
+		display()
 		os.Exit(1)
 	}
 
@@ -67,4 +70,18 @@ func ArgsCount(fs *flag.FlagSet) (count int) {
 		count += 1
 	})
 	return
+}
+
+func PopArg(name string, def string, args []string) (value string, repacked []string) {
+	for i, arg := range args {
+		if arg == "-"  + name && (i + 1 < len(args)) {
+			value = args[i + 1]
+			return value, append(args[:i], args[i + 2:]...)
+		}
+		if strings.HasPrefix(arg, "-" + name + "=") {
+			value = args[i][len(name) + 2:]
+			return value, append(args[:i], args[i + 1:]...)
+		}
+	}
+	return def, args
 }
