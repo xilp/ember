@@ -40,18 +40,11 @@ func (p *Integer) Add(a, b int) (int, error) {
 }
 
 func (p *Integer) Trait() map[string][]string {
-	//"Larger": []string{"a", "b"},
-	//"Add": []string{"a", "b"},
-	m := make(map[string][]string)
-	m["Larger"] = []string{"a", "b"}
-	m["Add"] = []string{"a", "b"}
+	m := map[string][]string {
+	"Larger": []string{"a", "b"},
+	"Add": []string{"a", "b"},
+	}
 	return m
-}
-
-type TestStruct struct {
-	x int
-	y int
-
 }
 
 func TestRpc(t *testing.T) {
