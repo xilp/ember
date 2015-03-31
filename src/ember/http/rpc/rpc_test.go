@@ -39,6 +39,21 @@ func (p *Integer) Add(a, b int) (int, error) {
 	return a + b, nil
 }
 
+func (p *Integer) Trait() map[string][]string {
+	//"Larger": []string{"a", "b"},
+	//"Add": []string{"a", "b"},
+	m := make(map[string][]string)
+	m["Larger"] = []string{"a", "b"}
+	m["Add"] = []string{"a", "b"}
+	return m
+}
+
+type TestStruct struct {
+	x int
+	y int
+
+}
+
 func TestRpc(t *testing.T) {
 	var a Integer
 
@@ -54,7 +69,7 @@ func TestRpc(t *testing.T) {
 	}
 	var b B
 
-	if err := c.MakeRpc(&b); err != nil {
+	if err := c.MakeRpc(&b, &a); err != nil {
 		t.Fatal(err)
 	}
 

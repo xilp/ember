@@ -12,6 +12,10 @@ import (
 	"sync"
 )
 
+type ApiTrait interface {
+	Trait() map[string][]string
+}
+
 const (
 	StatusOK = "OK"
 	StatusErr = "error"
@@ -36,6 +40,7 @@ func (p *ErrRpcServer) Error() string {
 type Server struct {
 	funcs map[string]reflect.Value
 	objs map[string]interface{}
+	trait map[string][]string
 	sync.Mutex
 }
 
@@ -43,6 +48,7 @@ func NewServer() *Server {
 	return &Server {
 		funcs: make(map[string]reflect.Value),
 		objs: make(map[string]interface{}),
+		trait: make(map[string][]string),
 	}
 }
 
@@ -51,11 +57,15 @@ func (p *Server) Run(port int) error {
 	return http.ListenAndServe(":" + strconv.Itoa(port), nil)
 }
 
-func (p *Server) Register(obj interface{}) (err error) {
-	typ := reflect.TypeOf(obj)
+func (p *Server) Register(api ApiTrait) (err error) {
+	typ := reflect.TypeOf(api)
 	for i := 0; i < typ.NumMethod(); i++ {
 		method := typ.Method(i)
-		err = p.register(method.Name, obj, method.Func.Interface())
+		name := method.Name
+		if (name == "Trait") {
+			continue
+		}
+		err = p.register(name, api, method.Func.Interface())
 		if err != nil {
 			return
 		}
@@ -63,7 +73,7 @@ func (p *Server) Register(obj interface{}) (err error) {
 	return
 }
 
-func (p *Server) register(name string, obj interface{}, fun interface{}) (err error) {
+func (p *Server) register(name string, api ApiTrait, fun interface{}) (err error) {
 	fv := reflect.ValueOf(fun)
 
 	err = callable(fv)
@@ -91,8 +101,11 @@ func (p *Server) register(name string, obj interface{}, fun interface{}) (err er
 		return
 	}
 
+	for fun, args := range api.Trait() {
+		p.trait[fun] = args
+	}
 	p.funcs[name] = fv
-	p.objs[name] = obj
+	p.objs[name] = api
 	return
 }
 
@@ -142,8 +155,9 @@ func (p *Server) handle(w http.ResponseWriter, r *http.Request) (result []interf
 	}
 
 	var in struct {
-		Args []json.RawMessage
+		Args map[string]json.RawMessage
 	}
+
 	err = json.Unmarshal(data, &in)
 	if err != nil {
 		return
@@ -153,7 +167,7 @@ func (p *Server) handle(w http.ResponseWriter, r *http.Request) (result []interf
 	return p.invoke(name, in.Args)
 }
 
-func (p *Server) invoke(name string, args []json.RawMessage) (ret []interface{}, err error) {
+func (p *Server) invoke(name string, args map[string]json.RawMessage) (ret []interface{}, err error) {
 	p.Lock()
 	fun, ok := p.funcs[name]
 	p.Unlock()
@@ -167,20 +181,23 @@ func (p *Server) invoke(name string, args []json.RawMessage) (ret []interface{},
 		return
 	}
 
-	in := make([]reflect.Value, len(args) + 1)
+	in := make([]reflect.Value, fun.Type().NumIn())
 	in[0] = reflect.ValueOf(p.objs[name])
 
-	for i := 1; i <= len(args); i++ {
-		if args[i - 1] == nil {
-			in[i] = reflect.Zero(fun.Type().In(i))
+	for i, argName := range p.trait[name] {
+		if args[argName] == nil {
+			in[i + 1] = reflect.Zero(fun.Type().In(i))
 		} else {
-			typ := fun.Type().In(i)
+			typ := fun.Type().In(i + 1)
 			val := reflect.New(typ)
-			err = json.Unmarshal(args[i - 1], val.Interface())
+			if _, ok := args[argName]; !ok {
+				return nil, NewErrRpcServer(fmt.Errorf("arg %s missing", argName))
+			}
+			err = json.Unmarshal(args[argName], val.Interface())
 			if err != nil {
 				return nil, NewErrRpcServer(err)
 			}
-			in[i] = val.Elem()
+			in[i + 1] = val.Elem()
 		}
 	}
 
@@ -229,7 +246,7 @@ func callable(fun reflect.Value) (err error) {
 			} else if s, ok := e.(string); ok {
 				err = NewErrRpcServer(errors.New(s))
 			} else {
-				err =NewErrRpcServer(ErrUnknown)
+				err = NewErrRpcServer(ErrUnknown)
 			}
 		}
 	}()

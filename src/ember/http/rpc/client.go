@@ -12,20 +12,26 @@ import (
 
 type Client struct {
 	url string
+	trait map[string][]string
+	funs map[string]interface{}
 }
 
 func NewClient(url string) *Client {
-	return &Client{url: url + "/"}
+	return &Client{
+		url: url + "/",
+		trait: make(map[string][]string),
+		funs: make(map[string]interface{}),
+	}
 }
 
-func (p *Client) MakeRpc(obj interface{}) (err error) {
+func (p *Client) MakeRpc(obj interface{}, api ApiTrait) (err error) {
 	typ := reflect.TypeOf(obj).Elem()
 	for i := 0; i < typ.NumField(); i++ {
 		val := reflect.ValueOf(obj).Elem()
 		structField := typ.Field(i)
 		name := structField.Name
 		field := val.Field(i)
-		err = p.create(name, field.Addr().Interface())
+		err = p.create(name, api, field.Addr().Interface())
 		if err != nil {
 			return
 		}
@@ -33,7 +39,7 @@ func (p *Client) MakeRpc(obj interface{}) (err error) {
 	return
 }
 
-func (p *Client) create(name string, fptr interface{}) (err error) {
+func (p *Client) create(name string, api ApiTrait, fptr interface{}) (err error) {
 	defer func() {
 		e := recover()
 		if e != nil {
@@ -59,6 +65,10 @@ func (p *Client) create(name string, fptr interface{}) (err error) {
 		return
 	}
 
+	for fun, args := range api.Trait() {
+		p.trait[fun] = args
+	}
+
 	fun := func(in []reflect.Value) []reflect.Value {
 		return p.call(fn, name, in)
 	}
@@ -68,17 +78,17 @@ func (p *Client) create(name string, fptr interface{}) (err error) {
 	return
 }
 
-func (p *Client) Call(name string, args string) []interface{} {
+// TODO: cli
+func (p *Client) Call(name string, jsonArgs string) []interface{} {
 	return nil
 }
 
 func (p *Client) call(fn reflect.Value, name string, in []reflect.Value) []reflect.Value {
-	args := make([]interface{}, len(in))
-	for i := 0; i < len(in); i++ {
-		args[i] = in[i].Interface()
+	nameValuePair := make(map[string]interface{})
+	for i, argName := range p.trait[name] {
+		nameValuePair[argName] = in[i].Interface()
 	}
-
-	inJson := NewInArgs(args)
+	inJson := NewInArgs(nameValuePair)
 	inData, err := json.Marshal(inJson)
 	if err != nil {
 		return p.returnCallError(fn, err)
@@ -139,10 +149,12 @@ func (c *Client) returnCallError(fn reflect.Value, err error) []reflect.Value {
 	return out
 }
 
-func NewInArgs(args []interface{}) *InArgs {
+func NewInArgs(args map[string]interface{}) *InArgs {
 	return &InArgs{args}
 }
 
 type InArgs struct {
-	Args []interface{} `json:"args"`
+	//Args interface{} `json:"args"`
+	Args map[string]interface{} `json:"args"`
+
 }
