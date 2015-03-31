@@ -1,8 +1,8 @@
 export GOPATH := $(shell pwd)
 
-.PHONY: server test
-
+.PHONY: server test all travis
 all: server test
+travis: all
 
 server:
 	go install -v ./...
