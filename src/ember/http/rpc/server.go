@@ -154,17 +154,14 @@ func (p *Server) handle(w http.ResponseWriter, r *http.Request) (result []interf
 		return
 	}
 
-	var in struct {
-		Args map[string]json.RawMessage
-	}
-
+	var in map[string]json.RawMessage
 	err = json.Unmarshal(data, &in)
 	if err != nil {
 		return
 	}
 
 	name := strings.TrimLeft(r.URL.Path, "/")
-	return p.invoke(name, in.Args)
+	return p.invoke(name, in)
 }
 
 func (p *Server) invoke(name string, args map[string]json.RawMessage) (ret []interface{}, err error) {
