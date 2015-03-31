@@ -48,7 +48,7 @@ func NewServer() *Server {
 	return &Server {
 		funcs: make(map[string]reflect.Value),
 		objs: make(map[string]interface{}),
-		trait: make(map[string][]string)
+		trait: make(map[string][]string),
 	}
 }
 
@@ -73,7 +73,7 @@ func (p *Server) Register(api ApiTrait) (err error) {
 	return
 }
 
-func (p *Server) register(name string, api interface{}, fun interface{}) (err error) {
+func (p *Server) register(name string, api ApiTrait, fun interface{}) (err error) {
 	fv := reflect.ValueOf(fun)
 
 	err = callable(fv)
@@ -181,17 +181,17 @@ func (p *Server) invoke(name string, args map[string]json.RawMessage) (ret []int
 		return
 	}
 
-	in := make([]reflect.Value, len(args) + 1)
+	in := make([]reflect.Value, fun.Type().NumIn())
 	in[0] = reflect.ValueOf(p.objs[name])
 
 	for i, argName := range p.trait[name] {
-		if args[i] == nil {
+		if args[argName] == nil {
 			in[i + 1] = reflect.Zero(fun.Type().In(i))
 		} else {
-			typ := fun.Type().In(i)
+			typ := fun.Type().In(i + 1)
 			val := reflect.New(typ)
 			if _, ok := args[argName]; !ok {
-				return nil, NewErrRpcServer(fmt.Errorf("arg s% missing", argName))
+				return nil, NewErrRpcServer(fmt.Errorf("arg %s missing", argName))
 			}
 			err = json.Unmarshal(args[argName], val.Interface())
 			if err != nil {
@@ -246,7 +246,7 @@ func callable(fun reflect.Value) (err error) {
 			} else if s, ok := e.(string); ok {
 				err = NewErrRpcServer(errors.New(s))
 			} else {
-				err =NewErrRpcServer(ErrUnknown)
+				err = NewErrRpcServer(ErrUnknown)
 			}
 		}
 	}()
