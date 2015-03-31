@@ -4,7 +4,6 @@ import (
 	"sync"
 	"testing"
 	"time"
-	"fmt"
 )
 
 var testServerOnce sync.Once
@@ -30,10 +29,6 @@ func newTestClient() *Client {
 	return testClient
 }
 
-type ApiTrait interface {
-	Trait() map[string][]string
-}
-
 type Integer int;
 
 func (p *Integer) Larger(a, b int) (bool, error) {
@@ -44,9 +39,19 @@ func (p *Integer) Add(a, b int) (int, error) {
 	return a + b, nil
 }
 
-func () Trait() map[string][]string {
-	"Larger": []string{"a", "b"},
-	"Add": []string{"a", "b"},
+func (p *Integer) Trait() map[string][]string {
+	//"Larger": []string{"a", "b"},
+	//"Add": []string{"a", "b"},
+	m := make(map[string][]string)
+	m["Larger"] = []string{"a", "b"}
+	m["Add"] = []string{"a", "b"}
+	return m
+}
+
+type TestStruct struct {
+	x int
+	y int
+
 }
 
 func TestRpc(t *testing.T) {
@@ -64,7 +69,7 @@ func TestRpc(t *testing.T) {
 	}
 	var b B
 
-	if err := c.MakeRpc(&b); err != nil {
+	if err := c.MakeRpc(&b, &a); err != nil {
 		t.Fatal(err)
 	}
 
