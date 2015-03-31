@@ -4,6 +4,8 @@ export GOPATH := $(shell pwd)
 
 all: server test
 
+travis: all
+
 server:
 	go install -v ./...
 
