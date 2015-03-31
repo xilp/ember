@@ -40,6 +40,14 @@ func (p *Server) Stop() (err error) {
 	return
 }
 
+func (p *Server) Trait() map[string][]string {
+	return map[string][]string {
+		"Echo": []string{"msg"},
+		"Panic": []string{},
+		"Stop": []string{},
+	}
+}
+
 func NewServer() *Server {
 	return &Server{}
 }

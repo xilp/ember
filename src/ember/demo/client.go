@@ -6,7 +6,7 @@ import (
 
 func NewClient(addr string) (p *Client, err error) {
 	p = &Client{}
-	err = rpc.NewClient(addr).MakeRpc(p)
+	err = rpc.NewClient(addr).MakeRpc(p, &Server{})
 	return
 }
 
