@@ -88,8 +88,8 @@ func (p *Client) call(fn reflect.Value, name string, in []reflect.Value) []refle
 	for i, argName := range p.trait[name] {
 		nameValuePair[argName] = in[i].Interface()
 	}
-	inJson := NewInArgs(nameValuePair)
-	inData, err := json.Marshal(inJson)
+	//inJson := NewInArgs(nameValuePair)
+	inData, err := json.Marshal(nameValuePair)
 	if err != nil {
 		return p.returnCallError(fn, err)
 	}
