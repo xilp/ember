@@ -46,7 +46,11 @@ func (p *Client) CmdCall(args []string) {
 	ret, err := p.Rpc.Call(args)
 	cli.Check(err)
 	for i := 0; i < len(ret) - 1; i++ {
-		fmt.Printf("%#v", ret[i])
+		val := fmt.Sprintf("%#v", ret[i])
+		if val[0] == '"' && val[len(val) - 1] =='"' && len(val) > 2 {
+			val = val[1:len(val) - 1]
+		}
+		fmt.Print(val)
 		if i + 1 != len(ret) - 1 {
 			fmt.Printf(", ")
 		}
@@ -55,6 +59,5 @@ func (p *Client) CmdCall(args []string) {
 }
 
 func (p *Client) CmdStop(args []string) {
-	cli.ParseFlag(flag.NewFlagSet("stop", flag.ContinueOnError), args)
-	cli.Check(p.Stop())
+	p.CmdCall([]string{"Stop"})
 }
