@@ -4,6 +4,7 @@ import (
 	"sync"
 	"testing"
 	"time"
+	"fmt"
 )
 
 var testServerOnce sync.Once
@@ -29,6 +30,10 @@ func newTestClient() *Client {
 	return testClient
 }
 
+type ApiTrait interface {
+	Trait() map[string][]string
+}
+
 type Integer int;
 
 func (p *Integer) Larger(a, b int) (bool, error) {
@@ -37,6 +42,11 @@ func (p *Integer) Larger(a, b int) (bool, error) {
 
 func (p *Integer) Add(a, b int) (int, error) {
 	return a + b, nil
+}
+
+func () Trait() map[string][]string {
+	"Larger": []string{"a", "b"},
+	"Add": []string{"a", "b"},
 }
 
 func TestRpc(t *testing.T) {
