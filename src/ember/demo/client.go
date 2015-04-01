@@ -12,7 +12,8 @@ func NewClient(addr string) (p *Client, err error) {
 
 type Client struct {
 	Rpc *rpc.Client
+	Stop func() (err error)
 	Echo func(msg string) (echo string, err error)
 	Panic func() (err error)
-	Stop func() (err error)
+	Error func() (err error)
 }

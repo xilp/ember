@@ -9,6 +9,8 @@ import (
 	"reflect"
 	"strconv"
 	"strings"
+	"time"
+	"ember/measure"
 )
 
 type ApiTrait interface {
@@ -40,38 +42,53 @@ type Server struct {
 	fns map[string]reflect.Value
 	objs map[string]interface{}
 	trait map[string][]string
+	measure *measure.Measure
 }
 
-func NewServer() *Server {
-	return &Server {
-		fns: make(map[string]reflect.Value),
-		objs: make(map[string]interface{}),
-		trait: make(map[string][]string),
+func NewServer() (p *Server) {
+	p = &Server {
+		make(map[string]reflect.Value),
+		make(map[string]interface{}),
+		make(map[string][]string),
+		measure.NewMeasure(time.Second * 60, time.Second * 60 * 60 * 24),
 	}
+	err := p.reg(p.measure, MeasureTrait)
+	if err != nil {
+		panic(err)
+	}
+	return
 }
 
 func (p *Server) Run(port int) error {
-	http.HandleFunc("/", p.router)
-	return http.ListenAndServe(":" + strconv.Itoa(port), nil)
+	mux := http.NewServeMux()
+	mux.HandleFunc("/", p.router)
+	return http.ListenAndServe(":" + strconv.Itoa(port), mux)
 }
 
-func (p *Server) Register(api ApiTrait) (err error) {
+func (p *Server) Reg(api ApiTrait) (err error) {
+	return p.reg(api, api.Trait())
+}
+
+func (p *Server) reg(api interface{}, trait map[string][]string) (err error) {
 	typ := reflect.TypeOf(api)
 	for i := 0; i < typ.NumMethod(); i++ {
 		method := typ.Method(i)
 		name := method.Name
-		if (name == "Trait") {
+		if _, ok := trait[name]; !ok {
 			continue
 		}
-		err = p.register(name, api, method.Func.Interface())
+		err = p.create(name, api, method.Func.Interface())
 		if err != nil {
 			return
+		}
+		for fn, args := range trait {
+			p.trait[fn] = args
 		}
 	}
 	return
 }
 
-func (p *Server) register(name string, api ApiTrait, fn interface{}) (err error) {
+func (p *Server) create(name string, api interface{}, fn interface{}) (err error) {
 	fv := reflect.ValueOf(fn)
 
 	err = callable(fv)
@@ -96,18 +113,28 @@ func (p *Server) register(name string, api ApiTrait, fn interface{}) (err error)
 		return
 	}
 
-	for fn, args := range api.Trait() {
-		p.trait[fn] = args
-	}
 	p.fns[name] = fv
 	p.objs[name] = api
 	return
 }
 
 func (p *Server) router(w http.ResponseWriter, r *http.Request) {
+	url := strings.Split(strings.Trim(r.URL.Path, "/"), "/")
+	name := url[len(url) - 1]
+
+	begin := time.Now().UnixNano()
+	cost := begin
+
+	defer func() {
+		end := time.Now().UnixNano()
+		p.measure.Record("api.cost.handle." + name, cost - begin)
+		p.measure.Record("api.cost.all." + name, end - begin)
+	}()
+
 	var status string
 	var detail string
-	result, err := p.handle(w, r)
+	result, err := p.handle(name, w, r)
+	cost = time.Now().UnixNano()
 	if err == nil {
 		status = StatusOK
 	} else {
@@ -142,7 +169,7 @@ func (p *Server) router(w http.ResponseWriter, r *http.Request) {
 	// TODO: log here
 }
 
-func (p *Server) handle(w http.ResponseWriter, r *http.Request) (result []interface{}, err error) {
+func (p *Server) handle(name string, w http.ResponseWriter, r *http.Request) (result []interface{}, err error) {
 	defer r.Body.Close()
 	data, err := ioutil.ReadAll(r.Body)
 	if err != nil {
@@ -155,7 +182,6 @@ func (p *Server) handle(w http.ResponseWriter, r *http.Request) (result []interf
 		return
 	}
 
-	name := strings.TrimLeft(r.URL.Path, "/")
 	return p.invoke(name, in)
 }
 
@@ -260,3 +286,5 @@ func call(fn reflect.Value, in []reflect.Value) (out []reflect.Value, err error)
 	out = fn.Call(in)
 	return
 }
+
+var MeasureTrait = map[string][]string{"MeasureSync": {"time"}}

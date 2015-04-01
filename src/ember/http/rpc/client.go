@@ -8,6 +8,7 @@ import (
 	"io/ioutil"
 	"net/http"
 	"reflect"
+	"ember/measure"
 )
 
 type Client struct {
@@ -16,15 +17,28 @@ type Client struct {
 	fns map[string]interface{}
 }
 
-func NewClient(url string) *Client {
-	return &Client{
+func NewClient(url string) (p *Client) {
+	p = &Client {
 		url: url + "/",
 		trait: make(map[string][]string),
 		fns: make(map[string]interface{}),
 	}
+
+	var m struct {
+		MeasureSync func(time int64) (measure.MeasureData, error)
+	}
+	err := p.reg(&m, MeasureTrait)
+	if err != nil {
+		panic(err)
+	}
+	return
 }
 
 func (p *Client) Reg(obj interface{}, api ApiTrait) (err error) {
+	return p.reg(obj, api.Trait())
+}
+
+func (p *Client) reg(obj interface{}, trait map[string][]string) (err error) {
 	typ := reflect.TypeOf(obj).Elem()
 	for i := 0; i < typ.NumField(); i++ {
 		val := reflect.ValueOf(obj).Elem()
@@ -34,7 +48,7 @@ func (p *Client) Reg(obj interface{}, api ApiTrait) (err error) {
 		if callable(field) != nil {
 			continue
 		}
-		err = p.create(name, api, field.Addr().Interface())
+		err = p.create(name, trait, field.Addr().Interface())
 		if err != nil {
 			return
 		}
@@ -42,18 +56,7 @@ func (p *Client) Reg(obj interface{}, api ApiTrait) (err error) {
 	return
 }
 
-func (p *Client) create(name string, api ApiTrait, fptr interface{}) (err error) {
-	defer func() {
-		e := recover()
-		if e != nil {
-			if r, ok := e.(error); ok {
-				err = r
-			} else {
-				err = errors.New(e.(string))
-			}
-		}
-	}()
-
+func (p *Client) create(name string, trait map[string][]string, fptr interface{}) (err error) {
 	fn := reflect.ValueOf(fptr).Elem()
 
 	nOut := fn.Type().NumOut();
@@ -68,7 +71,7 @@ func (p *Client) create(name string, api ApiTrait, fptr interface{}) (err error)
 		return
 	}
 
-	for fn, args := range api.Trait() {
+	for fn, args := range trait {
 		p.trait[fn] = args
 	}
 
@@ -155,9 +158,16 @@ type InArgs struct {
 	Args map[string]interface{} `json:"args"`
 }
 
-func (p *Client) Call(args []string) (ret []interface{}, err error) {
+func (p *Client) List() (ret []string) {
+	for k, _ := range p.fns {
+		ret = append(ret, k)
+	}
+	return
+}
+
+func (p *Client) Invoke(args []string) (ret []interface{}, err error) {
 	if len(args) == 0 {
-		err = fmt.Errorf("missing api name")
+		err = fmt.Errorf("missed api name. all: %v", p.List())
 		return
 	}
 
@@ -165,14 +175,15 @@ func (p *Client) Call(args []string) (ret []interface{}, err error) {
 	args = args[1:]
 	fn := p.fns[name]
 	if fn == nil {
-		err = fmt.Errorf("api %s not found", name)
+		err = fmt.Errorf("'%s' not found. all: %v", name, p.List())
 		return
 	}
 
 	fv := reflect.ValueOf(fn)
 
-	if fv.Type().NumOut() - 1 != len(args) || len(p.trait[name]) != len(args) {
-		err = fmt.Errorf("api %s params count unmatched(%d/%d)", name, len(args), fv.Type().NumOut() - 1)
+	nOut := fv.Type().NumOut() - 1
+	if nOut != len(args) || len(p.trait[name]) != len(args) {
+		err = fmt.Errorf("'%s' args list %v unmatched (need %d, got %d)", name, p.trait[name], len(args), nOut)
 		return
 	}
 
@@ -216,4 +227,23 @@ func (p *Client) Call(args []string) (ret []interface{}, err error) {
 	}
 
 	return ret, nil
+}
+
+func (p *Client) Call(args []string) (ret string, err error) {
+	objs, err := p.Invoke(args)
+	if err != nil {
+		return
+	}
+
+	for i := 0; i < len(objs) - 1; i++ {
+		val := fmt.Sprintf("%#v", objs[i])
+		if val[0] == '"' && val[len(val) - 1] =='"' && len(val) > 2 {
+			val = val[1:len(val) - 1]
+		}
+		ret += val
+		if i + 1 != len(objs) - 1 {
+			ret += ", "
+		}
+	}
+	return
 }
