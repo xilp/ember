@@ -13,24 +13,27 @@ import (
 type Client struct {
 	url string
 	trait map[string][]string
-	funs map[string]interface{}
+	fns map[string]interface{}
 }
 
 func NewClient(url string) *Client {
 	return &Client{
 		url: url + "/",
 		trait: make(map[string][]string),
-		funs: make(map[string]interface{}),
+		fns: make(map[string]interface{}),
 	}
 }
 
-func (p *Client) MakeRpc(obj interface{}, api ApiTrait) (err error) {
+func (p *Client) Reg(obj interface{}, api ApiTrait) (err error) {
 	typ := reflect.TypeOf(obj).Elem()
 	for i := 0; i < typ.NumField(); i++ {
 		val := reflect.ValueOf(obj).Elem()
 		structField := typ.Field(i)
 		name := structField.Name
 		field := val.Field(i)
+		if callable(field) != nil {
+			continue
+		}
 		err = p.create(name, api, field.Addr().Interface())
 		if err != nil {
 			return
@@ -65,25 +68,21 @@ func (p *Client) create(name string, api ApiTrait, fptr interface{}) (err error)
 		return
 	}
 
-	for fun, args := range api.Trait() {
-		p.trait[fun] = args
+	for fn, args := range api.Trait() {
+		p.trait[fn] = args
 	}
 
-	fun := func(in []reflect.Value) []reflect.Value {
-		return p.call(fn, name, in)
+	wrapper := func(in []reflect.Value) []reflect.Value {
+		return p.invoke(fn, name, in)
 	}
 
-	fv := reflect.MakeFunc(fn.Type(), fun)
+	fv := reflect.MakeFunc(fn.Type(), wrapper)
 	fn.Set(fv)
+	p.fns[name] = fn.Interface()
 	return
 }
 
-// TODO: cli
-func (p *Client) Call(name string, jsonArgs string) []interface{} {
-	return nil
-}
-
-func (p *Client) call(fn reflect.Value, name string, in []reflect.Value) []reflect.Value {
+func (p *Client) invoke(fn reflect.Value, name string, in []reflect.Value) []reflect.Value {
 	nameValuePair := make(map[string]interface{})
 	for i, argName := range p.trait[name] {
 		nameValuePair[argName] = in[i].Interface()
@@ -153,7 +152,68 @@ func NewInArgs(args map[string]interface{}) *InArgs {
 }
 
 type InArgs struct {
-	//Args interface{} `json:"args"`
 	Args map[string]interface{} `json:"args"`
+}
 
+func (p *Client) Call(args []string) (ret []interface{}, err error) {
+	if len(args) == 0 {
+		err = fmt.Errorf("missing api name")
+		return
+	}
+
+	name := args[0]
+	args = args[1:]
+	fn := p.fns[name]
+	if fn == nil {
+		err = fmt.Errorf("api %s not found", name)
+		return
+	}
+
+	fv := reflect.ValueOf(fn)
+
+	if fv.Type().NumOut() - 1 != len(args) || len(p.trait[name]) != len(args) {
+		err = fmt.Errorf("api %s params count unmatched(%d/%d)", name, len(args), fv.Type().NumOut() - 1)
+		return
+	}
+
+	in := make([]reflect.Value, len(args))
+
+	for i, arg := range args {
+		if arg == "" {
+			in[i] = reflect.Zero(fv.Type().In(i))
+		} else {
+			typ := fv.Type().In(i)
+			val := reflect.New(typ)
+			if typ.Kind() == reflect.String {
+				arg = "\"" + arg + "\""
+			}
+			err = json.Unmarshal([]byte(arg), val.Interface())
+			if err != nil {
+				return nil, err
+			}
+			in[i] = val.Elem()
+		}
+	}
+
+	out, err := call(fv, in)
+	if err != nil {
+		return nil, err
+	}
+
+	ret = make([]interface{}, len(out))
+	for i := 0; i < len(ret); i++ {
+		ret[i] = out[i].Interface()
+	}
+
+	pv := out[len(out) - 1].Interface()
+	if pv != nil {
+		if e, ok := pv.(error); ok {
+			err = e
+		} else if e, ok := pv.(string); ok {
+			err = fmt.Errorf(e)
+		}
+		return nil, err
+	}
+
+	return ret, nil
 }

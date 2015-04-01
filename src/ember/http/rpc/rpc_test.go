@@ -62,7 +62,7 @@ func TestRpc(t *testing.T) {
 	}
 	var b B
 
-	if err := c.MakeRpc(&b, &a); err != nil {
+	if err := c.Reg(&b, &a); err != nil {
 		t.Fatal(err)
 	}
 
