@@ -45,17 +45,7 @@ func (p *CliServer) CmdRun(args []string) {
 func (p *Client) CmdCall(args []string) {
 	ret, err := p.Rpc.Call(args)
 	cli.Check(err)
-	for i := 0; i < len(ret) - 1; i++ {
-		val := fmt.Sprintf("%#v", ret[i])
-		if val[0] == '"' && val[len(val) - 1] =='"' && len(val) > 2 {
-			val = val[1:len(val) - 1]
-		}
-		fmt.Print(val)
-		if i + 1 != len(ret) - 1 {
-			fmt.Printf(", ")
-		}
-	}
-	fmt.Printf("\n")
+	fmt.Println(ret)
 }
 
 func (p *Client) CmdStop(args []string) {
