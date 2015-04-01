@@ -144,9 +144,16 @@ type InArgs struct {
 	Args map[string]interface{} `json:"args"`
 }
 
-func (p *Client) Call(args []string) (ret []interface{}, err error) {
+func (p *Client) List() (ret []string) {
+	for k, _ := range p.fns {
+		ret = append(ret, k)
+	}
+	return
+}
+
+func (p *Client) Invoke(args []string) (ret []interface{}, err error) {
 	if len(args) == 0 {
-		err = fmt.Errorf("missing api name")
+		err = fmt.Errorf("missed api name. all: %v", p.List())
 		return
 	}
 
@@ -154,14 +161,15 @@ func (p *Client) Call(args []string) (ret []interface{}, err error) {
 	args = args[1:]
 	fn := p.fns[name]
 	if fn == nil {
-		err = fmt.Errorf("api %s not found", name)
+		err = fmt.Errorf("'%s' not found. all: %v", name, p.List())
 		return
 	}
 
 	fv := reflect.ValueOf(fn)
 
-	if fv.Type().NumOut() - 1 != len(args) || len(p.trait[name]) != len(args) {
-		err = fmt.Errorf("api %s params count unmatched(%d/%d)", name, len(args), fv.Type().NumOut() - 1)
+	nOut := fv.Type().NumOut() - 1
+	if nOut != len(args) || len(p.trait[name]) != len(args) {
+		err = fmt.Errorf("'%s' args list %v unmatched (need %d, got %d)", name, p.trait[name], len(args), nOut)
 		return
 	}
 
@@ -205,4 +213,23 @@ func (p *Client) Call(args []string) (ret []interface{}, err error) {
 	}
 
 	return ret, nil
+}
+
+func (p *Client) Call(args []string) (ret string, err error) {
+	objs, err := p.Invoke(args)
+	if err != nil {
+		return
+	}
+
+	for i := 0; i < len(objs) - 1; i++ {
+		val := fmt.Sprintf("%#v", objs[i])
+		if val[0] == '"' && val[len(val) - 1] =='"' && len(val) > 2 {
+			val = val[1:len(val) - 1]
+		}
+		ret += val
+		if i + 1 != len(objs) - 1 {
+			ret += ", "
+		}
+	}
+	return
 }
