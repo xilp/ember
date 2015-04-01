@@ -8,6 +8,7 @@ import (
 	"io/ioutil"
 	"net/http"
 	"reflect"
+	"ember/measure"
 )
 
 type Client struct {
@@ -16,15 +17,28 @@ type Client struct {
 	fns map[string]interface{}
 }
 
-func NewClient(url string) *Client {
-	return &Client{
+func NewClient(url string) (p *Client) {
+	p = &Client{
 		url: url + "/",
 		trait: make(map[string][]string),
 		fns: make(map[string]interface{}),
 	}
+
+	var m struct {
+		MeasureSync func(time int64) (measure.MeasureData, error)
+	}
+	err := p.reg(&m, MeasureTrait)
+	if err != nil {
+		panic(err)
+	}
+	return
 }
 
 func (p *Client) Reg(obj interface{}, api ApiTrait) (err error) {
+	return p.reg(obj, api.Trait())
+}
+
+func (p *Client) reg(obj interface{}, trait map[string][]string) (err error) {
 	typ := reflect.TypeOf(obj).Elem()
 	for i := 0; i < typ.NumField(); i++ {
 		val := reflect.ValueOf(obj).Elem()
@@ -34,7 +48,7 @@ func (p *Client) Reg(obj interface{}, api ApiTrait) (err error) {
 		if callable(field) != nil {
 			continue
 		}
-		err = p.create(name, api, field.Addr().Interface())
+		err = p.create(name, trait, field.Addr().Interface())
 		if err != nil {
 			return
 		}
@@ -42,7 +56,7 @@ func (p *Client) Reg(obj interface{}, api ApiTrait) (err error) {
 	return
 }
 
-func (p *Client) create(name string, api ApiTrait, fptr interface{}) (err error) {
+func (p *Client) create(name string, trait map[string][]string, fptr interface{}) (err error) {
 	fn := reflect.ValueOf(fptr).Elem()
 
 	nOut := fn.Type().NumOut();
@@ -57,7 +71,7 @@ func (p *Client) create(name string, api ApiTrait, fptr interface{}) (err error)
 		return
 	}
 
-	for fn, args := range api.Trait() {
+	for fn, args := range trait {
 		p.trait[fn] = args
 	}
 

@@ -6,6 +6,7 @@ import (
 	"os"
 	"strconv"
 	"ember/cli"
+	"ember/measure"
 )
 
 func main() {
@@ -26,6 +27,7 @@ func main() {
 	cmds.Reg("run", "run server", server.CmdRun)
 	cmds.Reg("stop", "stop server", client.CmdStop)
 	cmds.Reg("api", "call server api by: name [arg] [arg]...", client.CmdCall)
+	cmds.Reg("status", "get server core status", client.CmdStatus)
 
 	cmds.Run(args)
 }
@@ -46,6 +48,18 @@ func (p *Client) CmdCall(args []string) {
 	ret, err := p.Rpc.Call(args)
 	cli.Check(err)
 	fmt.Println(ret)
+}
+
+func (p *Client) CmdStatus(args []string) {
+	ret, err := p.Rpc.Invoke([]string{"MeasureSync", "0"})
+	cli.Check(err)
+	if len(ret) != 2 {
+		fmt.Println(ret)
+	} else {
+		data := ret[0].(measure.MeasureData)
+		err = data.Dump(os.Stdout)
+		cli.Check(err)
+	}
 }
 
 func (p *Client) CmdStop(args []string) {

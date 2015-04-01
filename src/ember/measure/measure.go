@@ -5,10 +5,11 @@ import (
 	"sync"
 )
 
-func (p *Measure) After(time int64) MeasureData {
+func (p *Measure) MeasureSync(time int64) (ret MeasureData, err error) {
 	p.locker.Lock()
 	defer p.locker.Unlock()
-	return p.data.After(p.round(time))
+	ret = p.data.After(p.round(time))
+	return
 }
 
 func (p *Measure) Dump() MeasureData {
