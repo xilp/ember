@@ -144,9 +144,16 @@ type InArgs struct {
 	Args map[string]interface{} `json:"args"`
 }
 
+func (p *Client) List() (ret []string) {
+	for k, _ := range p.fns {
+		ret = append(ret, k)
+	}
+	return
+}
+
 func (p *Client) Call(args []string) (ret []interface{}, err error) {
 	if len(args) == 0 {
-		err = fmt.Errorf("missing api name")
+		err = fmt.Errorf("missed api name. all: %v", p.List())
 		return
 	}
 
@@ -154,14 +161,16 @@ func (p *Client) Call(args []string) (ret []interface{}, err error) {
 	args = args[1:]
 	fn := p.fns[name]
 	if fn == nil {
-		err = fmt.Errorf("api %s not found", name)
+		err = fmt.Errorf("'%s' not found. all: %v", name, p.List())
 		return
 	}
 
 	fv := reflect.ValueOf(fn)
 
-	if fv.Type().NumOut() - 1 != len(args) || len(p.trait[name]) != len(args) {
-		err = fmt.Errorf("api %s params count unmatched(%d/%d)", name, len(args), fv.Type().NumOut() - 1)
+	nOut := fv.Type().NumOut() - 1
+	if nOut != len(args) || len(p.trait[name]) != len(args) {
+		err = fmt.Errorf("'%s' args list %v unmatched (need %d, got %d)",
+			name, p.trait[name], len(args), nOut)
 		return
 	}
 
