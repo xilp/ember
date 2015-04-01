@@ -51,7 +51,7 @@ func TestRpc(t *testing.T) {
 	var a Integer
 
 	s := newTestServer()
-	s.Register(&a)
+	s.Reg(&a)
 	time.Sleep(time.Millisecond)
 
 	c := newTestClient()
@@ -62,7 +62,7 @@ func TestRpc(t *testing.T) {
 	}
 	var b B
 
-	if err := c.MakeRpc(&b, &a); err != nil {
+	if err := c.Reg(&b, &a); err != nil {
 		t.Fatal(err)
 	}
 
