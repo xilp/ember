@@ -47,10 +47,10 @@ func (p *Server) Stop() (err error) {
 
 func (p *Server) Trait() map[string][]string {
 	return map[string][]string {
-		"Stop": []string{},
-		"Echo": []string{"msg"},
-		"Panic": []string{},
-		"Error": []string{},
+		"Stop": {},
+		"Echo": {"msg"},
+		"Panic": {},
+		"Error": {},
 	}
 }
 

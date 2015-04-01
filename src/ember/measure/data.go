@@ -1,8 +1,20 @@
 package measure
 
 import (
+	"fmt"
+	"io"
 	"math"
 )
+
+func (p *MeasureData) Dump(w io.Writer) (err error) {
+	for _, it := range *p {
+		err = it.Dump(w)
+		if err != nil {
+			return
+		}
+	}
+	return
+}
 
 func (p *MeasureData) Merge(x *MeasureData) MeasureData {
 	// TODO
@@ -87,6 +99,23 @@ func NewMeasureData(count int) MeasureData {
 
 type MeasureData []*SpanData
 
+func (p *SpanData) Dump(w io.Writer) (err error) {
+	if p.Time == 0 {
+		return
+	}
+	_, err = w.Write([]byte(fmt.Sprintf("[Time Stamp: %d]\n", p.Time)))
+	if err != nil {
+		return
+	}
+	for k, v := range p.Data {
+		_, err = w.Write([]byte(fmt.Sprintf("%s %s\n", k, v.Dump())))
+		if err != nil {
+			return
+		}
+	}
+	return
+}
+
 func (p *SpanData) Record(name string, value int64) {
 	if _, ok := p.Data[name]; !ok {
 		p.Data[name] = NewSpecData()
@@ -121,6 +150,10 @@ func NewSpanData() *SpanData {
 type SpanData struct {
 	Time int64
 	Data map[string]*SpecData
+}
+
+func (p *SpecData) Dump() string {
+	return fmt.Sprintf("%d %d %d", p.Min, p.Max, p.Count)
 }
 
 func (p *SpecData) Record(value int64) {
