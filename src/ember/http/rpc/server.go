@@ -60,8 +60,9 @@ func NewServer() (p *Server) {
 }
 
 func (p *Server) Run(port int) error {
-	http.HandleFunc("/", p.router)
-	return http.ListenAndServe(":" + strconv.Itoa(port), nil)
+	mux := http.NewServeMux()
+	mux.HandleFunc("/", p.router)
+	return http.ListenAndServe(":" + strconv.Itoa(port), mux)
 }
 
 func (p *Server) Reg(api ApiTrait) (err error) {

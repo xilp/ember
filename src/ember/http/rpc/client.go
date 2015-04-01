@@ -18,7 +18,7 @@ type Client struct {
 }
 
 func NewClient(url string) (p *Client) {
-	p = &Client{
+	p = &Client {
 		url: url + "/",
 		trait: make(map[string][]string),
 		fns: make(map[string]interface{}),
