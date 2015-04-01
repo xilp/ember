@@ -28,7 +28,12 @@ func (p *Server) Echo(msg string) (echo string, err error) {
 }
 
 func (p *Server) Panic() (err error) {
-	err = errors.New("panic as expected")
+	panic("panic as expected")
+	return
+}
+
+func (p *Server) Error() (err error) {
+	err = errors.New("error as expected")
 	return
 }
 
@@ -42,9 +47,10 @@ func (p *Server) Stop() (err error) {
 
 func (p *Server) Trait() map[string][]string {
 	return map[string][]string {
+		"Stop": []string{},
 		"Echo": []string{"msg"},
 		"Panic": []string{},
-		"Stop": []string{},
+		"Error": []string{},
 	}
 }
 

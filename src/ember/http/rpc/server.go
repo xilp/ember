@@ -155,7 +155,8 @@ func (p *Server) handle(w http.ResponseWriter, r *http.Request) (result []interf
 		return
 	}
 
-	name := strings.TrimLeft(r.URL.Path, "/")
+	url := strings.Split(strings.Trim(r.URL.Path, "/"), "/")
+	name := url[len(url) - 1]
 	return p.invoke(name, in)
 }
 
