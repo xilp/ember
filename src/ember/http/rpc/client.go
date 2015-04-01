@@ -43,17 +43,6 @@ func (p *Client) Reg(obj interface{}, api ApiTrait) (err error) {
 }
 
 func (p *Client) create(name string, api ApiTrait, fptr interface{}) (err error) {
-	defer func() {
-		e := recover()
-		if e != nil {
-			if r, ok := e.(error); ok {
-				err = r
-			} else {
-				err = errors.New(e.(string))
-			}
-		}
-	}()
-
 	fn := reflect.ValueOf(fptr).Elem()
 
 	nOut := fn.Type().NumOut();

@@ -55,7 +55,7 @@ func (p *Server) Run(port int) error {
 	return http.ListenAndServe(":" + strconv.Itoa(port), nil)
 }
 
-func (p *Server) Register(api ApiTrait) (err error) {
+func (p *Server) Reg(api ApiTrait) (err error) {
 	typ := reflect.TypeOf(api)
 	for i := 0; i < typ.NumMethod(); i++ {
 		method := typ.Method(i)
