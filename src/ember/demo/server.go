@@ -14,7 +14,7 @@ func Launch(port int) (err error) {
 
 	s := NewServer()
 	rpc := rpc.NewServer()
-	err = rpc.Register(s)
+	err = rpc.Reg(s)
 	if err != nil {
 		return
 	}
