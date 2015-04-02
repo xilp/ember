@@ -205,7 +205,7 @@ func (p *Server) invoke(name string, args map[string]json.RawMessage) (ret []int
 	in[0] = reflect.ValueOf(p.objs[name])
 
 	for i, argName := range p.trait[name] {
-		if _, ok := args[argName] !ok {
+		if _, ok := args[argName]; !ok {
 			return nil, NewErrRpcServer(fmt.Errorf("arg %s missing", argName))
 		} else {
 			typ := fn.Type().In(i + 1)
