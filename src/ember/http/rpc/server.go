@@ -81,9 +81,7 @@ func (p *Server) reg(api interface{}, trait map[string][]string) (err error) {
 		if err != nil {
 			return
 		}
-		for fn, args := range trait {
-			p.trait[fn] = args
-		}
+		p.trait[name] = trait[name]
 	}
 	return
 }
@@ -201,14 +199,11 @@ func (p *Server) invoke(name string, args map[string]json.RawMessage) (ret []int
 	in[0] = reflect.ValueOf(p.objs[name])
 
 	for i, argName := range p.trait[name] {
-		if args[argName] == nil {
-			in[i + 1] = reflect.Zero(fn.Type().In(i))
+		if _, ok := args[argName]; !ok {
+			return nil, NewErrRpcServer(fmt.Errorf("api %s arg %s missing", argName))
 		} else {
 			typ := fn.Type().In(i + 1)
 			val := reflect.New(typ)
-			if _, ok := args[argName]; !ok {
-				return nil, NewErrRpcServer(fmt.Errorf("arg %s missing", argName))
-			}
 			err = json.Unmarshal(args[argName], val.Interface())
 			if err != nil {
 				return nil, NewErrRpcServer(err)
