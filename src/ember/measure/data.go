@@ -4,7 +4,9 @@ import (
 	"fmt"
 	"io"
 	"math"
-	"ember/base"
+
+	// TODO: readable
+	//"ember/base"
 )
 
 func (p *MeasureData) Dump(w io.Writer, readable bool) (err error) {
@@ -159,14 +161,10 @@ func (p *SpecData) Dump(readable bool) string {
 		avg = p.Max / p.Count
 	}
 
-	bkmg := func(val int64) string {
-		return base.Bkmg(p.Max, 5)
-	}
-
 	if readable {
 		return fmt.Sprintf("%d %d %d %d", p.Min, p.Max, p.Count, avg)
 	} else {
-		return fmt.Sprintf("%d %d %d %d", bkmg(p.Min), bkmg(p.Max), bkmg(p.Count), bkmg(avg))
+		return fmt.Sprintf("%d %d %d %d", p.Min, p.Max, p.Count, avg)
 	}
 }
 
