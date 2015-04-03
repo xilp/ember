@@ -57,7 +57,7 @@ func (p *Client) CmdStatus(args []string) {
 		fmt.Println(ret)
 	} else {
 		data := ret[0].(measure.MeasureData)
-		err = data.Dump(os.Stdout)
+		err = data.Dump(os.Stdout, true)
 		cli.Check(err)
 	}
 }
