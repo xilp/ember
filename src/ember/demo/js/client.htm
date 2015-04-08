@@ -1,0 +1,23 @@
+<html>
+<head>
+<script src="jquery-2.1.1.min.js"></script>
+<script src="client.js"></script>
+<script>
+$(document).ready(function() {
+	api = new Api('http://127.0.0.1:8080', function(e) {
+		alert('' + e);
+	});
+	api.call(
+		"Echo",
+		'{"msg": "Hello, girl"}',
+		function(data) {
+			$("#msg").html(data);
+		},
+		function(e) {
+			$("#msg").html("error" + e);
+		});
+});
+</script>
+</head>
+<body><div id="msg"></div></body>
+</html>
