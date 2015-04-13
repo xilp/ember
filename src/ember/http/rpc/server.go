@@ -26,18 +26,6 @@ const (
 
 var ErrUnknown = errors.New("unknown error type on call api")
 
-type ErrRpcServer struct {
-	err error
-}
-
-func NewErrRpcServer(e error) *ErrRpcServer {
-	return &ErrRpcServer{e}
-}
-
-func (p *ErrRpcServer) Error() string {
-	return "rpc server error: " + p.err.Error()
-}
-
 type Server struct {
 	fns map[string]reflect.Value
 	objs map[string]interface{}
@@ -61,7 +49,7 @@ func NewServer() (p *Server) {
 
 func (p *Server) Run(port int) error {
 	mux := http.NewServeMux()
-	mux.HandleFunc("/", p.router)
+	mux.HandleFunc("/", p.Serve)
 	return http.ListenAndServe(":" + strconv.Itoa(port), mux)
 }
 
@@ -116,7 +104,7 @@ func (p *Server) create(name string, api interface{}, fn interface{}) (err error
 	return
 }
 
-func (p *Server) router(w http.ResponseWriter, r *http.Request) {
+func (p *Server) Serve(w http.ResponseWriter, r *http.Request) {
 	url := strings.Split(strings.Trim(r.URL.Path, "/"), "/")
 	name := url[len(url) - 1]
 
@@ -283,3 +271,15 @@ func call(fn reflect.Value, in []reflect.Value) (out []reflect.Value, err error)
 }
 
 var MeasureTrait = map[string][]string{"MeasureSync": {"time"}}
+
+type ErrRpcServer struct {
+	err error
+}
+
+func NewErrRpcServer(e error) *ErrRpcServer {
+	return &ErrRpcServer{e}
+}
+
+func (p *ErrRpcServer) Error() string {
+	return "rpc server error: " + p.err.Error()
+}
