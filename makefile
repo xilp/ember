@@ -1,7 +1,6 @@
-.PHONY: server test all travis
+.PHONY: server test all
 
 all: server test
-travis: all
 
 server:
 	go clean ./...
