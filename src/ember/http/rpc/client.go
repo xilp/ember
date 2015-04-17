@@ -184,7 +184,8 @@ func (p *Client) Invoke(args []string) (ret []interface{}, err error) {
 	nIn := fv.Type().NumIn()
 	need := p.trait[name]
 	if nIn != len(args) || len(need) != len(args) {
-		err = fmt.Errorf("'%s' args list %v unmatched (need %d, got %d)", name, need, len(need), len(args))
+		err = fmt.Errorf("'%s' args list %v unmatched (need %d:%d, got %d)",
+			name, need, nIn, len(need), len(args))
 		return
 	}
 
