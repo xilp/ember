@@ -162,6 +162,9 @@ func (p *Server) handle(name string, w http.ResponseWriter, r *http.Request) (re
 		return
 	}
 
+	if len(data) == 0 {
+		return p.invoke(name, nil)
+	}
 	var in map[string]json.RawMessage
 	err = json.Unmarshal(data, &in)
 	if err != nil {
