@@ -8,10 +8,6 @@ import (
 )
 
 func Launch(port int) (err error) {
-	if err != nil {
-		return
-	}
-
 	s := NewServer()
 	rpc := rpc.NewServer()
 	err = rpc.Reg(s)

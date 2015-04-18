@@ -4,11 +4,14 @@ import (
 	"fmt"
 	"io"
 	"math"
+
+	// TODO: readable
+	//"ember/base"
 )
 
-func (p *MeasureData) Dump(w io.Writer) (err error) {
+func (p *MeasureData) Dump(w io.Writer, readable bool) (err error) {
 	for _, it := range *p {
-		err = it.Dump(w)
+		err = it.Dump(w, readable)
 		if err != nil {
 			return
 		}
@@ -99,7 +102,7 @@ func NewMeasureData(count int) MeasureData {
 
 type MeasureData []*SpanData
 
-func (p *SpanData) Dump(w io.Writer) (err error) {
+func (p *SpanData) Dump(w io.Writer, readable bool) (err error) {
 	if p.Time == 0 {
 		return
 	}
@@ -108,7 +111,7 @@ func (p *SpanData) Dump(w io.Writer) (err error) {
 		return
 	}
 	for k, v := range p.Data {
-		_, err = w.Write([]byte(fmt.Sprintf("%s %s\n", k, v.Dump())))
+		_, err = w.Write([]byte(fmt.Sprintf("%s %s\n", k, v.Dump(readable))))
 		if err != nil {
 			return
 		}
@@ -152,8 +155,17 @@ type SpanData struct {
 	Data map[string]*SpecData
 }
 
-func (p *SpecData) Dump() string {
-	return fmt.Sprintf("%d %d %d", p.Min, p.Max, p.Count)
+func (p *SpecData) Dump(readable bool) string {
+	avg := int64(0)
+	if p.Count != 0 {
+		avg = p.Max / p.Count
+	}
+
+	if readable {
+		return fmt.Sprintf("%d %d %d %d", p.Min, p.Max, p.Count, avg)
+	} else {
+		return fmt.Sprintf("%d %d %d %d", p.Min, p.Max, p.Count, avg)
+	}
 }
 
 func (p *SpecData) Record(value int64) {
