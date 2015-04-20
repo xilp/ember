@@ -262,7 +262,7 @@ func callable(fn reflect.Value) (err error) {
 	defer func() {
 		if e := recover(); e != nil {
 			if r, ok := e.(error); ok {
-				err = r
+				err = NewErrRpcServer(r)
 			} else if s, ok := e.(string); ok {
 				err = NewErrRpcServer(errors.New(s))
 			} else {
@@ -279,7 +279,7 @@ func call(fn reflect.Value, in []reflect.Value) (out []reflect.Value, err error)
 		e := recover()
 		if e != nil {
 			if r, ok := e.(error); ok {
-				err = r
+				err = NewErrRpcServer(r)
 			} else if s, ok := e.(string); ok {
 				err = errors.New(s)
 			} else {
