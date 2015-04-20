@@ -202,7 +202,7 @@ func (p *Client) Invoke(args []string) (ret []interface{}, err error) {
 		return nil, err
 	}
 
-	return ret, nil
+	return ret[: len(ret) - 1], nil
 }
 
 func (p *Client) Call(args []string) (ret string, err error) {

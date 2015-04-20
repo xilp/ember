@@ -45,7 +45,7 @@ func (p *Server) reg(prefix string, api interface{}, trait map[string][]string) 
 		}
 		p.fns[name] = reflect.ValueOf(fn)
 		p.objs[name] = api
-		p.trait[name] = trait[name]
+		p.trait[name] = trait[method.Name]
 	}
 	return
 }
