@@ -281,9 +281,9 @@ func call(fn reflect.Value, in []reflect.Value) (out []reflect.Value, err error)
 			if r, ok := e.(error); ok {
 				err = NewErrRpcServer(r)
 			} else if s, ok := e.(string); ok {
-				err = errors.New(s)
+				err = NewErrRpcServer(errors.New(s))
 			} else {
-				err = errors.New("unknown error type on call api")
+				err = NewErrRpcServer(errors.New("unknown error type on call api"))
 			}
 		}
 	}()
