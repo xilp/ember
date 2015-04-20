@@ -13,37 +13,10 @@ import (
 	"ember/measure"
 )
 
-type ApiTrait interface {
-	Trait() map[string][]string
-}
-
-const (
-	StatusOK = "OK"
-	StatusErr = "error"
-	HttpCodeOK = http.StatusOK
-	HttpCodeErr = 599
-)
-
 var ErrUnknown = errors.New("unknown error type on call api")
 
-type Server struct {
-	fns map[string]reflect.Value
-	objs map[string]interface{}
-	trait map[string][]string
-	measure *measure.Measure
-}
-
-func NewServer() (p *Server) {
-	p = &Server {
-		make(map[string]reflect.Value),
-		make(map[string]interface{}),
-		make(map[string][]string),
-		measure.NewMeasure(time.Second * 60, time.Second * 60 * 60 * 24),
-	}
-	err := p.reg(p.measure, MeasureTrait)
-	if err != nil {
-		panic(err)
-	}
+func (p *Server) List() (apis map[string][]string, err error) {
+	apis = p.trait
 	return
 }
 
@@ -54,22 +27,25 @@ func (p *Server) Run(port int) error {
 }
 
 func (p *Server) Reg(api ApiTrait) (err error) {
-	return p.reg(api, api.Trait())
+	return p.reg("", api, api.Trait())
 }
 
-func (p *Server) reg(api interface{}, trait map[string][]string) (err error) {
+func (p *Server) reg(prefix string, api interface{}, trait map[string][]string) (err error) {
 	typ := reflect.TypeOf(api)
 	for i := 0; i < typ.NumMethod(); i++ {
 		method := typ.Method(i)
-		name := method.Name
-		if _, ok := trait[name]; !ok {
+		name := prefix + method.Name
+		if _, ok := trait[method.Name]; !ok {
 			continue
 		}
-		err = p.create(name, api, method.Func.Interface())
+		fn := method.Func.Interface()
+		err = p.create(name, api, fn)
 		if err != nil {
 			return
 		}
-		p.trait[name] = trait[name]
+		p.fns[name] = reflect.ValueOf(fn)
+		p.objs[name] = api
+		p.trait[name] = trait[method.Name]
 	}
 	return
 }
@@ -98,23 +74,22 @@ func (p *Server) create(name string, api interface{}, fn interface{}) (err error
 		err = NewErrRpcServer(fmt.Errorf("%s has registered", name))
 		return
 	}
-
-	p.fns[name] = fv
-	p.objs[name] = api
 	return
 }
 
 func (p *Server) Serve(w http.ResponseWriter, r *http.Request) {
-	url := strings.Split(strings.Trim(r.URL.Path, "/"), "/")
-	name := url[len(url) - 1]
-
 	begin := time.Now().UnixNano()
 	cost := begin
+	cb := 0
+
+	url := strings.Split(strings.Trim(r.URL.Path, "/"), "/")
+	name := url[len(url) - 1]
 
 	defer func() {
 		end := time.Now().UnixNano()
 		p.measure.Record("api.cost.handle." + name, cost - begin)
 		p.measure.Record("api.cost.all." + name, end - begin)
+		p.measure.Record("api.response." + name, int64(cb))
 	}()
 
 	var status string
@@ -141,6 +116,8 @@ func (p *Server) Serve(w http.ResponseWriter, r *http.Request) {
 			panic("error marshal: must OK, too")
 		}
 	}
+
+	cb = len(ret)
 
 	h := w.Header()
 	h.Set("Content-Type", "text/json")
@@ -226,6 +203,47 @@ func (p *Server) invoke(name string, args map[string]json.RawMessage) (ret []int
 	return ret, nil
 }
 
+func NewServer() (p *Server) {
+	p = &Server {
+		make(map[string]reflect.Value),
+		make(map[string]interface{}),
+		make(map[string][]string),
+		measure.NewMeasure(time.Second * 60, time.Second * 60 * 60 * 24),
+	}
+
+	err := p.reg("Measure.", p.measure, MeasureTrait)
+	if err != nil {
+		panic(err)
+	}
+
+	err = p.reg("Api.", p, BuiltinTrait)
+	if err != nil {
+		panic(err)
+	}
+	return
+}
+
+type Server struct {
+	fns map[string]reflect.Value
+	objs map[string]interface{}
+	trait map[string][]string
+	measure *measure.Measure
+}
+
+var MeasureTrait = map[string][]string {
+	"Sync": {"time"},
+}
+var BuiltinTrait = map[string][]string {
+	"List": {},
+}
+
+const (
+	StatusOK = "OK"
+	StatusErr = "error"
+	HttpCodeOK = http.StatusOK
+	HttpCodeErr = 599
+)
+
 func NewResponse(status, detail string, result []interface{}) *Response {
 	return &Response {
 		status,
@@ -244,7 +262,7 @@ func callable(fn reflect.Value) (err error) {
 	defer func() {
 		if e := recover(); e != nil {
 			if r, ok := e.(error); ok {
-				err = r
+				err = NewErrRpcServer(r)
 			} else if s, ok := e.(string); ok {
 				err = NewErrRpcServer(errors.New(s))
 			} else {
@@ -261,7 +279,7 @@ func call(fn reflect.Value, in []reflect.Value) (out []reflect.Value, err error)
 		e := recover()
 		if e != nil {
 			if r, ok := e.(error); ok {
-				err = r
+				err = NewErrRpcServer(r)
 			} else if s, ok := e.(string); ok {
 				err = errors.New(s)
 			} else {
@@ -273,8 +291,6 @@ func call(fn reflect.Value, in []reflect.Value) (out []reflect.Value, err error)
 	return
 }
 
-var MeasureTrait = map[string][]string{"MeasureSync": {"time"}}
-
 type ErrRpcServer struct {
 	err error
 }
@@ -285,4 +301,8 @@ func NewErrRpcServer(e error) *ErrRpcServer {
 
 func (p *ErrRpcServer) Error() string {
 	return "rpc server error: " + p.err.Error()
+}
+
+type ApiTrait interface {
+	Trait() map[string][]string
 }
