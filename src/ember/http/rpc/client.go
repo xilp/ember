@@ -1,242 +1,67 @@
 package rpc
 
 import (
-	"bytes"
 	"errors"
-	"encoding/json"
 	"fmt"
-	"io/ioutil"
-	"net/http"
-	"reflect"
+	"strings"
 	"ember/measure"
 )
-func (p *Client) Reg(obj interface{}, api ApiTrait) (err error) {
-	return p.reg("", obj, api.Trait())
+
+func (p *Client) Reg(obj interface{}) (err error) {
+	return p.reg("", obj)
 }
 
-func (p *Client) reg(prefix string, obj interface{}, trait map[string][]string) (err error) {
-	typ := reflect.TypeOf(obj).Elem()
-	for i := 0; i < typ.NumField(); i++ {
-		val := reflect.ValueOf(obj).Elem()
-		field := typ.Field(i)
-		name := prefix + field.Name
-		fn := val.Field(i)
-		if callable(fn) != nil {
-			continue
-		}
-		fv, err := p.create(name, fn.Addr().Interface())
-		if err != nil {
-			return err
-		}
-		p.trait[name] = trait[field.Name]
-		p.fns[name] = fv
-	}
-	return
+func (p *Client) List() (fns []FnProto) {
+	return p.fns.List()
 }
 
-func (p *Client) create(name string, fptr interface{}) (nf interface{}, err error) {
-	fn := reflect.ValueOf(fptr).Elem()
-
-	nOut := fn.Type().NumOut();
-	if nOut == 0 || fn.Type().Out(nOut - 1).Kind() != reflect.Interface {
-		err = fmt.Errorf("%s return final output param must be error interface", name)
-		return
-	}
-
-	_, ok := fn.Type().Out(nOut - 1).MethodByName("Error")
-	if !ok {
-		err = fmt.Errorf("%s return final output param must be error interface", name)
-		return
-	}
-
-	wrapper := func(in []reflect.Value) []reflect.Value {
-		return p.invoke(fn, name, in)
-	}
-
-	fv := reflect.MakeFunc(fn.Type(), wrapper)
-	fn.Set(fv)
-	nf = fn.Interface()
-	return
-}
-
-func (p *Client) invoke(fn reflect.Value, name string, in []reflect.Value) []reflect.Value {
-	kvs := make(map[string]interface{})
-	for i, argName := range p.trait[name] {
-		kvs[argName] = in[i].Interface()
-	}
-	inData, err := json.Marshal(kvs)
-	if err != nil {
-		return p.returnCallError(fn, err)
-	}
-
-	resp, err := http.Post(p.url + name, "text/json", bytes.NewReader(inData))
-	if err != nil {
-		return p.returnCallError(fn, err)
-	}
-
-	defer resp.Body.Close()
-	outData, err := ioutil.ReadAll(resp.Body)
-	if err != nil {
-		return p.returnCallError(fn, err)
-	}
-
-	var outJson struct {
-		Status string
-		Detail string
-		Result []json.RawMessage
-	}
-
-	err = json.Unmarshal(outData, &outJson)
-	if err != nil {
-		return p.returnCallError(fn, err)
-	}
-
-	if outJson.Status != StatusOK {
-		return p.returnCallError(fn, errors.New(outJson.Detail))
-	}
-
-	out := make([]reflect.Value, fn.Type().NumOut())
-	for i := 0; i < len(out); i++ {
-		if len(outJson.Result) <= i || outJson.Result[i] == nil {
-			out[i] = reflect.Zero(fn.Type().Out(i))
-		} else {
-			typ := fn.Type().Out(i)
-			val := reflect.New(typ)
-			err = json.Unmarshal(outJson.Result[i], val.Interface())
-			if err != nil {
-				return p.returnCallError(fn, err)
-			}
-			out[i] = val.Elem()
-		}
-	}
-
-	return out
-}
-
-func (c *Client) returnCallError(fn reflect.Value, err error) []reflect.Value {
-	nOut := fn.Type().NumOut()
-	out := make([]reflect.Value, nOut)
-	for i := 0; i < nOut - 1; i++ {
-		out[i] = reflect.Zero(fn.Type().Out(i))
-	}
-
-	out[nOut-1] = reflect.ValueOf(&err).Elem()
-	return out
-}
-
-func NewInArgs(args map[string]interface{}) *InArgs {
-	return &InArgs{args}
-}
-
-type InArgs struct {
-	Args map[string]interface{} `json:"args"`
-}
-
-func (p *Client) List() (ret []string) {
-	for k, _ := range p.fns {
-		ret = append(ret, k)
-	}
-	return
-}
-
-func (p *Client) Invoke(args []string) (ret []interface{}, err error) {
-	if len(args) == 0 {
-		err = fmt.Errorf("missed api name. all: %v", p.List())
-		return
-	}
-
-	name := args[0]
-	args = args[1:]
+func (p *Client) Call(name string, args []string) (ret []interface{}, err error) {
 	fn := p.fns[name]
 	if fn == nil {
-		err = fmt.Errorf("'%s' not found. all: %v", name, p.List())
+		err = fmt.Errorf("%s not found", name)
 		return
 	}
-
-	fv := reflect.ValueOf(fn)
-
-	nIn := fv.Type().NumIn()
-	need := p.trait[name]
-	if nIn != len(args) || len(need) != len(args) {
-		err = fmt.Errorf("'%s' args list %v unmatched (need %d:%d, got %d)",
-			name, need, nIn, len(need), len(args))
-		return
-	}
-
-	in := make([]reflect.Value, len(args))
-
-	for i, arg := range args {
-		if arg == "" {
-			in[i] = reflect.Zero(fv.Type().In(i))
-		} else {
-			typ := fv.Type().In(i)
-			val := reflect.New(typ)
-			if typ.Kind() == reflect.String {
-				arg = "\"" + arg + "\""
-			}
-			err = json.Unmarshal([]byte(arg), val.Interface())
-			if err != nil {
-				return nil, err
-			}
-			in[i] = val.Elem()
+	in := make([][]byte, len(args))
+	for i, it := range args {
+		if fn.proto.ArgTypes[i] == "string" {
+			it = `"` + it + `"`
 		}
+		in[i] = []byte(it)
 	}
-
-	out, err := call(fv, in)
-	if err != nil {
-		return nil, err
-	}
-
-	ret = make([]interface{}, len(out))
-	for i := 0; i < len(ret); i++ {
-		ret[i] = out[i].Interface()
-	}
-
-	pv := out[len(out) - 1].Interface()
-	if pv != nil {
-		if e, ok := pv.(error); ok {
-			err = e
-		} else if e, ok := pv.(string); ok {
-			err = fmt.Errorf(e)
-		}
-		return nil, err
-	}
-
-	return ret[: len(ret) - 1], nil
+	return fn.Call(in)
 }
 
-func (p *Client) Call(args []string) (ret string, err error) {
-	objs, err := p.Invoke(args)
-	if err != nil {
-		return
-	}
-
-	for i := 0; i < len(objs) - 1; i++ {
-		val := fmt.Sprintf("%#v", objs[i])
-		if val[0] == '"' && val[len(val) - 1] =='"' && len(val) > 2 {
-			val = val[1:len(val) - 1]
+func (p *Client) reg(prefix string, obj interface{}) (err error) {
+	fns := NewFnTraits(obj)
+	for origin, fn := range fns {
+		name := prefix + origin
+		if _, ok := p.fns[name]; ok {
+			err = fmt.Errorf("%s has registered", name)
+			return
 		}
-		ret += val
-		if i + 1 != len(objs) - 1 {
-			ret += ", "
-		}
+		fn.Prefix(prefix)
+		p.fns[name] = fn
+		fn.Bind(p.addr + name)
 	}
 	return
 }
 
-func NewClient(url string) (p *Client) {
-	p = &Client {
-		url: url + "/",
-		trait: make(map[string][]string),
-		fns: make(map[string]interface{}),
+func NewClient(addr string) (p *Client) {
+	if !strings.HasPrefix(addr, "http") {
+		addr = "http://" + addr
+	}
+	if !strings.HasSuffix(addr, "/") {
+		addr = addr + "/"
 	}
 
-	err := p.reg("Measure.", &p.Measure, MeasureTrait)
+	p = &Client{addr: addr, fns: make(FnTraits)}
+
+	err := p.reg(MeasurePrefix, &p.Measure)
 	if err != nil {
 		panic(err)
 	}
 
-	err = p.reg("Api.", &p.Builtin, BuiltinTrait)
+	err = p.reg(BuiltinPrefix, &p.Builtin)
 	if err != nil {
 		panic(err)
 	}
@@ -244,17 +69,21 @@ func NewClient(url string) (p *Client) {
 }
 
 type Client struct {
-	url string
-	trait map[string][]string
-	fns map[string]interface{}
+	addr string
+	fns FnTraits
 	Measure Measure
 	Builtin Builtin
 }
 
 type Measure struct {
-	Sync func(time int64) (measure.MeasureData, error)
+	Sync func(time int64) (measure.MeasureData, error) `args:"time" return:"data"`
 }
 
 type Builtin struct {
-	List func() (map[string][]string, error)
+	List func() ([]FnProto, error) `return:"protos"`
 }
+
+var ErrApiExists = errors.New("api registered")
+
+const  MeasurePrefix = "Measure."
+const  BuiltinPrefix = "Builtin."
