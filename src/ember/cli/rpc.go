@@ -50,7 +50,7 @@ func (p *RpcHub) help(fns []rpc.FnProto) {
 	}
 
 	for _, fn := range fns {
-		fmt.Printf("%s%v => %v\n",
+		fmt.Printf("  %s%v => %v\n",
 			fn.Name,
 			types(fn.ArgNames, fn.ArgTypes, "(", ")"),
 			types(fn.ReturnNames, fn.ReturnTypes, "(", ")"))
@@ -64,6 +64,10 @@ func (p *RpcHub) CmdCall(args []string) {
 	}
 	ret, err := p.client.Call(args[0], args[1:])
 	Check(err)
+
+	if len(ret) == 0 {
+		return
+	}
 
 	var obj interface{}
 	obj = ret
