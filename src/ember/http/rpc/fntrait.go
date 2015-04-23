@@ -83,6 +83,11 @@ func (p *FnTrait) proxy(in []reflect.Value) (out []reflect.Value) {
 		}
 	}()
 
+	if len(p.proto.ArgNames) != len(in) {
+		err = ErrArgsNotMatched
+		return
+	}
+
 	args := make(map[string]interface{})
 	for i, name := range p.proto.ArgNames {
 		args[name] = in[i].Interface()
