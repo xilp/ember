@@ -12,17 +12,9 @@ func main() {
 }
 
 type Client struct {
-	Echo func(msg string) (echo string, err error)
+	Echo func(msg string) (echo string, err error) `args:"msg" return:"echo"`
 	Panic func() (err error)
 	Error func() (err error)
-}
-
-func (p *Server) Trait() map[string][]string {
-	return map[string][]string {
-		"Echo": {"msg"},
-		"Panic": {},
-		"Error": {},
-	}
 }
 
 func (p *Server) Echo(msg string) (echo string, err error) {

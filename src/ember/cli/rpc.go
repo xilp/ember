@@ -4,15 +4,13 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
-	"sort"
 	"strconv"
-	"strings"
 	"ember/http/rpc"
 )
 
 func (p *RpcHub) Run() {
 	if len(p.args) == 0 {
-		Errln("usage:\n  <bin> [-host=127.0.0.1] [-port=8080] command [args]\n\ncommand:")
+		Errln("usage:\n  <bin> [-host=" + DefaultHost + "] [-port=" + DefaultPort + "] command [args]\n\ncommand:")
 		p.cmds.Help(true)
 		os.Exit(1)
 	}
@@ -24,39 +22,39 @@ func (p *RpcHub) Cmds() *Cmds {
 }
 
 func (p *RpcHub) CmdRun([]string) {
-	err := p.server.Run(p.port)
+	err := p.server.Run("/", p.port)
 	Check(err)
 }
 
 func (p *RpcHub) CmdList([]string) {
+	fns := p.client.List()
+	p.help(fns)
+}
+
+func (p *RpcHub) CmdRemote([]string) {
 	fns, err := p.client.Builtin.List()
 	Check(err)
+	p.help(fns)
+}
 
-	apis := []string{}
-	builtins := []string{}
-	for name, _ := range fns {
-		if strings.Index(name, ".") < 0 {
-			apis = append(apis, name)
-		} else {
-			builtins = append(builtins, name)
-		}
-	}
-	sort.Strings(apis)
-	sort.Strings(builtins)
-
-	display := func(names []string) {
-		for _, name := range names {
-			args := fns[name]
-			if len(args) == 0 {
-				fmt.Println(name + " []")
-			} else {
-				fmt.Printf("%s %v\n", name, args)
+func (p *RpcHub) help(fns []rpc.FnProto) {
+	types := func(names []string, types []string, lb, rb string) string {
+		str := lb
+		for i, name := range names {
+			str += types[i] + " " + name
+			if i + 1 != len(names) {
+				str += ", "
 			}
 		}
+		return str + rb
 	}
 
-	display(apis)
-	display(builtins)
+	for _, fn := range fns {
+		fmt.Printf("  %s%v => %v\n",
+			fn.Name,
+			types(fn.ArgNames, fn.ArgTypes, "(", ")"),
+			types(fn.ReturnNames, fn.ReturnTypes, "(", ")"))
+	}
 }
 
 func (p *RpcHub) CmdCall(args []string) {
@@ -64,8 +62,12 @@ func (p *RpcHub) CmdCall(args []string) {
 		p.CmdList(args)
 		return
 	}
-	ret, err := p.client.Invoke(args)
+	ret, err := p.client.Call(args[0], args[1:])
 	Check(err)
+
+	if len(ret) == 0 {
+		return
+	}
 
 	var obj interface{}
 	obj = ret
@@ -84,29 +86,27 @@ func (p *RpcHub) CmdStatus(args []string) {
 	Check(err)
 }
 
-func NewRpcHub(args []string, sobj rpc.ApiTrait, cobj interface{}) (p *RpcHub)  {
-	host, args := PopArg("host", "127.0.0.1", args)
-	portstr, args := PopArg("port", "8080", args)
+func NewRpcHub(args []string, sobj interface{}, cobj interface{}) (p *RpcHub)  {
+	host, args := PopArg("host", DefaultHost, args)
+	portstr, args := PopArg("port", DefaultPort, args)
 	port, err := strconv.Atoi(portstr)
 	Check(err)
 
 	addr := host + ":" + portstr
-	if !strings.HasPrefix(addr, "http") {
-		addr = "http://" + addr
-	}
 
 	client := rpc.NewClient(addr)
-	err = client.Reg(cobj, sobj)
+	err = client.Reg(cobj)
 	Check(err)
 
 	server := rpc.NewServer()
-	err = server.Reg(sobj)
+	err = server.Reg(sobj, cobj)
 	Check(err)
 
 	p = &RpcHub{host, port, args, NewCmds(), server, client}
 
 	p.cmds.Reg("run", "run server", p.CmdRun)
-	p.cmds.Reg("list", "list server api", p.CmdList)
+	p.cmds.Reg("list", "list api from local info", p.CmdList)
+	p.cmds.Reg("remote", "list api from remote", p.CmdRemote)
 	p.cmds.Reg("call", "call server api by: name [arg] [arg]...", p.CmdCall)
 	p.cmds.Reg("status", "get server status", p.CmdStatus)
 	return
@@ -120,3 +120,6 @@ type RpcHub struct {
 	server *rpc.Server
 	client *rpc.Client
 }
+
+const DefaultHost = "127.0.0.1"
+const DefaultPort = "8080"
