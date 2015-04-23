@@ -65,7 +65,7 @@ func (p *RpcHub) CmdCall(args []string) {
 	ret, err := p.client.Call(args[0], args[1:])
 	Check(err)
 
-	if len(ret) == 0 {
+	if len(ret) == 0 || ret == nil {
 		return
 	}
 
