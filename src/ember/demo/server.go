@@ -3,19 +3,26 @@ package main
 import (
 	"errors"
 	"os"
-	"time"
-	"ember/http/rpc"
+	"ember/cli"
 )
 
-func Launch(port int) (err error) {
-	s := NewServer()
-	rpc := rpc.NewServer()
-	err = rpc.Reg(s)
-	if err != nil {
-		return
-	}
+func main() {
+	hub := cli.NewRpcHub(os.Args[1:], &Server{}, &Client{})
+	hub.Run()
+}
 
-	return rpc.Run(port)
+type Client struct {
+	Echo func(msg string) (echo string, err error)
+	Panic func() (err error)
+	Error func() (err error)
+}
+
+func (p *Server) Trait() map[string][]string {
+	return map[string][]string {
+		"Echo": {"msg"},
+		"Panic": {},
+		"Error": {},
+	}
 }
 
 func (p *Server) Echo(msg string) (echo string, err error) {
@@ -33,26 +40,4 @@ func (p *Server) Error() (err error) {
 	return
 }
 
-func (p *Server) Stop() (err error) {
-	go func() {
-		time.Sleep(time.Second)
-		os.Exit(0)
-	}()
-	return
-}
-
-func (p *Server) Trait() map[string][]string {
-	return map[string][]string {
-		"Stop": {},
-		"Echo": {"msg"},
-		"Panic": {},
-		"Error": {},
-	}
-}
-
-func NewServer() *Server {
-	return &Server{}
-}
-
-type Server struct {
-}
+type Server struct{}

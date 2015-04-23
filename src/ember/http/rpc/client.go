@@ -10,53 +10,31 @@ import (
 	"reflect"
 	"ember/measure"
 )
-
-type Client struct {
-	url string
-	trait map[string][]string
-	fns map[string]interface{}
-}
-
-func NewClient(url string) (p *Client) {
-	p = &Client {
-		url: url + "/",
-		trait: make(map[string][]string),
-		fns: make(map[string]interface{}),
-	}
-
-	var m struct {
-		MeasureSync func(time int64) (measure.MeasureData, error)
-	}
-	err := p.reg(&m, MeasureTrait)
-	if err != nil {
-		panic(err)
-	}
-	return
-}
-
 func (p *Client) Reg(obj interface{}, api ApiTrait) (err error) {
-	return p.reg(obj, api.Trait())
+	return p.reg("", obj, api.Trait())
 }
 
-func (p *Client) reg(obj interface{}, trait map[string][]string) (err error) {
+func (p *Client) reg(prefix string, obj interface{}, trait map[string][]string) (err error) {
 	typ := reflect.TypeOf(obj).Elem()
 	for i := 0; i < typ.NumField(); i++ {
 		val := reflect.ValueOf(obj).Elem()
-		structField := typ.Field(i)
-		name := structField.Name
-		field := val.Field(i)
-		if callable(field) != nil {
+		field := typ.Field(i)
+		name := prefix + field.Name
+		fn := val.Field(i)
+		if callable(fn) != nil {
 			continue
 		}
-		err = p.create(name, trait, field.Addr().Interface())
+		fv, err := p.create(name, fn.Addr().Interface())
 		if err != nil {
-			return
+			return err
 		}
+		p.trait[name] = trait[field.Name]
+		p.fns[name] = fv
 	}
 	return
 }
 
-func (p *Client) create(name string, trait map[string][]string, fptr interface{}) (err error) {
+func (p *Client) create(name string, fptr interface{}) (nf interface{}, err error) {
 	fn := reflect.ValueOf(fptr).Elem()
 
 	nOut := fn.Type().NumOut();
@@ -71,26 +49,22 @@ func (p *Client) create(name string, trait map[string][]string, fptr interface{}
 		return
 	}
 
-	for fn, args := range trait {
-		p.trait[fn] = args
-	}
-
 	wrapper := func(in []reflect.Value) []reflect.Value {
 		return p.invoke(fn, name, in)
 	}
 
 	fv := reflect.MakeFunc(fn.Type(), wrapper)
 	fn.Set(fv)
-	p.fns[name] = fn.Interface()
+	nf = fn.Interface()
 	return
 }
 
 func (p *Client) invoke(fn reflect.Value, name string, in []reflect.Value) []reflect.Value {
-	nameValuePair := make(map[string]interface{})
+	kvs := make(map[string]interface{})
 	for i, argName := range p.trait[name] {
-		nameValuePair[argName] = in[i].Interface()
+		kvs[argName] = in[i].Interface()
 	}
-	inData, err := json.Marshal(nameValuePair)
+	inData, err := json.Marshal(kvs)
 	if err != nil {
 		return p.returnCallError(fn, err)
 	}
@@ -228,7 +202,7 @@ func (p *Client) Invoke(args []string) (ret []interface{}, err error) {
 		return nil, err
 	}
 
-	return ret, nil
+	return ret[: len(ret) - 1], nil
 }
 
 func (p *Client) Call(args []string) (ret string, err error) {
@@ -248,4 +222,39 @@ func (p *Client) Call(args []string) (ret string, err error) {
 		}
 	}
 	return
+}
+
+func NewClient(url string) (p *Client) {
+	p = &Client {
+		url: url + "/",
+		trait: make(map[string][]string),
+		fns: make(map[string]interface{}),
+	}
+
+	err := p.reg("Measure.", &p.Measure, MeasureTrait)
+	if err != nil {
+		panic(err)
+	}
+
+	err = p.reg("Api.", &p.Builtin, BuiltinTrait)
+	if err != nil {
+		panic(err)
+	}
+	return
+}
+
+type Client struct {
+	url string
+	trait map[string][]string
+	fns map[string]interface{}
+	Measure Measure
+	Builtin Builtin
+}
+
+type Measure struct {
+	Sync func(time int64) (measure.MeasureData, error)
+}
+
+type Builtin struct {
+	List func() (map[string][]string, error)
 }
