@@ -7,7 +7,7 @@ import (
 )
 
 func main() {
-	hub := cli.NewRpcHub(os.Args[1:], &Server{}, &Client{})
+	hub := cli.NewRpcHub(os.Args[1:], &Server{}, &Client{}, "/")
 	hub.Run()
 }
 
