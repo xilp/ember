@@ -3,6 +3,7 @@ package cli
 import (
 	"encoding/json"
 	"fmt"
+	"net/http"
 	"os"
 	"strconv"
 	"ember/http/rpc"
@@ -21,8 +22,12 @@ func (p *RpcHub) Cmds() *Cmds {
 	return p.cmds
 }
 
+func (p *RpcHub) Mux() *http.ServeMux {
+	return p.mux
+}
+
 func (p *RpcHub) CmdRun([]string) {
-	err := p.server.Run("/", p.port)
+	err := p.server.Run(p.path, p.port)
 	Check(err)
 }
 
@@ -86,7 +91,7 @@ func (p *RpcHub) CmdStatus(args []string) {
 	Check(err)
 }
 
-func NewRpcHub(args []string, sobj interface{}, cobj interface{}) (p *RpcHub)  {
+func NewRpcHub(args []string, sobj interface{}, cobj interface{}, path string) (p *RpcHub)  {
 	host, args := PopArg("host", DefaultHost, args)
 	portstr, args := PopArg("port", DefaultPort, args)
 	port, err := strconv.Atoi(portstr)
@@ -102,7 +107,7 @@ func NewRpcHub(args []string, sobj interface{}, cobj interface{}) (p *RpcHub)  {
 	err = server.Reg(sobj, cobj)
 	Check(err)
 
-	p = &RpcHub{host, port, args, NewCmds(), server, client}
+	p = &RpcHub{host, port, args, NewCmds(), server, client, http.NewServeMux(), path}
 
 	p.cmds.Reg("run", "run server", p.CmdRun)
 	p.cmds.Reg("list", "list api from local info", p.CmdList)
@@ -119,6 +124,8 @@ type RpcHub struct {
 	cmds *Cmds
 	server *rpc.Server
 	client *rpc.Client
+	mux *http.ServeMux
+	path string
 }
 
 const DefaultHost = "127.0.0.1"
