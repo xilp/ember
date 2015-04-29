@@ -117,7 +117,7 @@ func (p *FnTrait) proxy(in []reflect.Value) (out []reflect.Value) {
 	}
 	err = json.Unmarshal(body, &ret)
 	if err != nil {
-		err = fmt.Errorf("error: %v\n%v", err.Error(), string(body))
+		err = fmt.Errorf("json decode error: %v\n%v", err.Error(), string(body))
 		return
 	}
 
