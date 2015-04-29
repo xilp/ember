@@ -169,9 +169,9 @@ func NewResponse(status, detail string, result []interface{}) *Response {
 }
 
 type Response struct {
-	Status string        "status"
-	Detail string        "detail"
-	Result []interface{} "result"
+	Status string        `json:"Status"`
+	Detail string        `json:"Detail"`
+	Result []interface{} `json:"Result"`
 }
 
 const (

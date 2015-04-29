@@ -61,12 +61,12 @@ type ApiFunc reflect.Value
 var ErrReturnTypeNotMatched = errors.New("last return value not type error")
 
 func (p IsError) Check() (err error) {
-	if p.e == nil {
+	if p.E == nil {
 		return
 	}
-	if r, ok := p.e.(error); ok {
+	if r, ok := p.E.(error); ok {
 		err = r
-	} else if s, ok := p.e.(string); ok {
+	} else if s, ok := p.E.(string); ok {
 		err = errors.New(s)
 	} else {
 		err = ErrCallUnknown
@@ -74,6 +74,6 @@ func (p IsError) Check() (err error) {
 	return
 }
 
-type IsError struct{e interface{}}
+type IsError struct{E interface{}}
 
 var ErrCallUnknown = errors.New("unknown error type on call api")
