@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io/ioutil"
 	"net/http"
 	"reflect"
@@ -116,6 +117,7 @@ func (p *FnTrait) proxy(in []reflect.Value) (out []reflect.Value) {
 	}
 	err = json.Unmarshal(body, &ret)
 	if err != nil {
+		err = fmt.Errorf("error: %v [%v]", err.Error(), string(body))
 		return
 	}
 
