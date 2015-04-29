@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/http"
 	"os"
+	"reflect"
 	"strconv"
 	"ember/http/rpc"
 )
@@ -27,10 +28,15 @@ func (p *RpcHub) Mux() *http.ServeMux {
 }
 
 func (p *RpcHub) CmdRun([]string) {
-	server, err := p.sobj()
-	Check(err)
+	sobj := p.sobj
+	if reflect.TypeOf(sobj).Kind() == reflect.Func {
+		out := reflect.ValueOf(sobj).Call([]reflect.Value{})
+		err := rpc.IsError{out[len(out) - 1].Interface()}.Check()
+		Check(err)
+		sobj = out[0].Interface()
+	}
 	rpc := rpc.NewServer()
-	err = rpc.Reg(server, p.cobj)
+	err := rpc.Reg(sobj, p.cobj)
 	Check(err)
 	err = rpc.Run(p.path, p.port)
 	Check(err)
@@ -96,7 +102,7 @@ func (p *RpcHub) CmdStatus(args []string) {
 	Check(err)
 }
 
-func NewRpcHub(args []string, sobj NewServerFunc, cobj interface{}, path string) (p *RpcHub)  {
+func NewRpcHub(args []string, sobj interface{}, cobj interface{}, path string) (p *RpcHub)  {
 	host, args := PopArg("host", DefaultHost, args)
 	portstr, args := PopArg("port", DefaultPort, args)
 	port, err := strconv.Atoi(portstr)
@@ -123,7 +129,7 @@ type RpcHub struct {
 	port int
 	args []string
 	cmds *Cmds
-	sobj NewServerFunc
+	sobj interface{}
 	cobj interface{}
 	client *rpc.Client
 	mux *http.ServeMux
