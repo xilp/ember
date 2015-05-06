@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io/ioutil"
 	"net/http"
 	"reflect"
@@ -83,6 +84,11 @@ func (p *FnTrait) proxy(in []reflect.Value) (out []reflect.Value) {
 		}
 	}()
 
+	if len(p.proto.ArgNames) != len(in) {
+		err = ErrArgsNotMatched
+		return
+	}
+
 	args := make(map[string]interface{})
 	for i, name := range p.proto.ArgNames {
 		args[name] = in[i].Interface()
@@ -111,6 +117,7 @@ func (p *FnTrait) proxy(in []reflect.Value) (out []reflect.Value) {
 	}
 	err = json.Unmarshal(body, &ret)
 	if err != nil {
+		err = fmt.Errorf("<json decode error: %v>\n%v", err.Error(), string(body))
 		return
 	}
 

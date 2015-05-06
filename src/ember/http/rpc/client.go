@@ -80,7 +80,8 @@ type Measure struct {
 }
 
 type Builtin struct {
-	List func() ([]FnProto, error) `return:"protos"`
+	List   func() ([]FnProto, error) `return:"protos"`
+	Uptime func() (start int64, dura int64, err error) `return:"start,dura"`
 }
 
 var ErrApiExists = errors.New("api registered")
