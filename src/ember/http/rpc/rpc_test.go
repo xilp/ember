@@ -101,7 +101,7 @@ func TestFnProto(t *testing.T) {
 
 type TestClient struct {
 	Foo    func() (error)                 `return:"err"`
-	Add    func(a, b, c int)(int, error)  `args:"a,b, c" return:"sum,err"`
+	Add    func(a, b, c int)(int, error)  `args:"a,b,c" return:"sum,err"`
 	Larger func(a, b int)(bool, error)    `args:"a,b" return:"larger,err"`
 }
 

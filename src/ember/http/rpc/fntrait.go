@@ -112,11 +112,19 @@ func (p *FnTrait) proxy(in []reflect.Value) (out []reflect.Value) {
 	var ret struct {
 		Status string
 		Detail string
-		Result []json.RawMessage
+		Result map[string]json.RawMessage
 	}
 	err = json.Unmarshal(body, &ret)
 	if err != nil {
 		return
+	}
+
+	retArr := make([]json.RawMessage, len(ret.Result))
+	retArgs := p.proto.ReturnNames
+	for index, retArg := range retArgs {
+		if (index < len(retArr)) {
+			retArr[index] = ret.Result[retArg]
+		}
 	}
 
 	if ret.Status != StatusOK {
@@ -125,18 +133,31 @@ func (p *FnTrait) proxy(in []reflect.Value) (out []reflect.Value) {
 	}
 
 	for i := 0; i < len(out); i++ {
-		if len(ret.Result) <= i || ret.Result[i] == nil {
+		if len(retArr) <= i || retArr[i] == nil {
 			out[i] = reflect.Zero(fn.Type().Out(i))
 		} else {
 			typ := fn.Type().Out(i)
 			val := reflect.New(typ)
-			err = json.Unmarshal(ret.Result[i], val.Interface())
+			err = json.Unmarshal(retArr[i], val.Interface())
 			if err != nil {
 				return
 			}
 			out[i] = val.Elem()
 		}
 	}
+//	for i := 0; i < len(out); i++ {
+//		if len(ret.Result) <= i || ret.Result[i] == nil {
+//			out[i] = reflect.Zero(fn.Type().Out(i))
+//		} else {
+//			typ := fn.Type().Out(i)
+//			val := reflect.New(typ)
+//			err = json.Unmarshal(ret.Result[i], val.Interface())
+//			if err != nil {
+//				return
+//			}
+//			out[i] = val.Elem()
+//		}
+//	}
 	return
 }
 

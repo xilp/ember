@@ -53,6 +53,28 @@ func (p *Server) Serve(w http.ResponseWriter, r *http.Request) {
 	_, err = w.Write(data)
 }
 
+//func (p *Server) handle(name string, w http.ResponseWriter, r *http.Request) (data []byte, err error) {
+//	var status string
+//	var detail string
+
+//	result, err := p.call(name, w, r)
+//	if err == nil {
+//		status = StatusOK
+//	} else {
+//		status = StatusErr
+//		result = nil
+//		detail = NewErrRpcFailed(err).Error()
+//	}
+
+//	resp := NewResponse(status, detail, result)
+//	data, err = json.Marshal(resp)
+//	if err != nil {
+//		resp = NewResponse(StatusErr, NewErrRpcFailed(err).Error(), nil)
+//		data, err = json.Marshal(resp)
+//	}
+//	return
+//}
+
 func (p *Server) handle(name string, w http.ResponseWriter, r *http.Request) (data []byte, err error) {
 	var status string
 	var detail string
@@ -66,7 +88,21 @@ func (p *Server) handle(name string, w http.ResponseWriter, r *http.Request) (da
 		detail = NewErrRpcFailed(err).Error()
 	}
 
-	resp := NewResponse(status, detail, result)
+	fn, ok := p.fns[name]
+	if !ok {
+		err = fmt.Errorf("%s not found", name)
+		return
+	}
+
+	retArgs := fn.proto.ReturnNames
+	m := make(map[string]interface{})
+	for index, value := range retArgs {
+		if index < len(result) {
+			m[value] = result[index]
+		}
+	}
+
+	resp := NewResponse(status, detail, m)
 	data, err = json.Marshal(resp)
 	if err != nil {
 		resp = NewResponse(StatusErr, NewErrRpcFailed(err).Error(), nil)
@@ -88,7 +124,6 @@ func (p *Server) call(name string, w http.ResponseWriter, r *http.Request) (ret 
 	if err != nil {
 		return
 	}
-
 	ret, err = fv.Invoke(fn.proto, data)
 	return
 }
@@ -164,18 +199,23 @@ type ErrRpcFailed struct {
 	err error
 }
 
-func NewResponse(status, detail string, result []interface{}) *Response {
+//func NewResponse(status, detail string, result []interface{}) *Response {
+//	return &Response{status, detail, result}
+//}
+
+func NewResponse(status, detail string, result map[string]interface{}) *Response {
 	return &Response{status, detail, result}
 }
 
 type Response struct {
-	Status string        `json:"Status"`
-	Detail string        `json:"Detail"`
-	Result []interface{} `json:"Result"`
+	Status string        `json:"status"`
+	Detail string        `json:"detail"`
+//	Result []interface{} `json:"Result"`
+	Result map[string]interface{} `json:"result"`
 }
 
 const (
-	StatusOK = "OK"
+	StatusOK = "ok"
 	StatusErr = "error"
 	HttpCodeOK = http.StatusOK
 	HttpCodeErr = 599
