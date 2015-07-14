@@ -3,6 +3,7 @@ package rpc
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"reflect"
 )
 
@@ -26,6 +27,9 @@ func (p InValue) Make(fn reflect.Value) (in []reflect.Value, err error) {
 		val := reflect.New(typ)
 		err = json.Unmarshal(arg, val.Interface())
 		if err != nil {
+			err = fmt.Errorf(
+				"arg #%v(%v) marshal failed: '%v' => %v",
+				i, typ.Kind().String(), string(arg), err.Error())
 			return
 		}
 		in[i] = val.Elem()

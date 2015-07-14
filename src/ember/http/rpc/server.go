@@ -129,6 +129,13 @@ func format(fn *FnTrait, result []interface{}) (m map[string]interface{}) {
 	return
 }
 
+func (p *Server) Uptime() (start int64, dura int64, err error) {
+	now := time.Now().UnixNano()
+	start = p.start / int64(time.Second)
+	dura = (now - p.start) / int64(time.Second)
+	return
+}
+
 func (p *Server) List() (protos []FnProto, err error) {
 	protos = p.fns.List()
 	return
@@ -165,6 +172,7 @@ func NewServer() (p *Server) {
 		make(FnTraits),
 		make(FnValues),
 		measure.NewMeasure(time.Second * 60, time.Second * 60 * 60 * 24),
+		time.Now().UnixNano(),
 	}
 
 	err := p.reg(MeasurePrefix, p.measure, &Measure{})
@@ -183,6 +191,7 @@ type Server struct {
 	fns FnTraits
 	fvs FnValues
 	measure *measure.Measure
+	start int64
 }
 
 func (p *ErrRpcFailed) Error() string {
