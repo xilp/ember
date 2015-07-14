@@ -145,19 +145,6 @@ func (p *FnTrait) proxy(in []reflect.Value) (out []reflect.Value) {
 			out[i] = val.Elem()
 		}
 	}
-//	for i := 0; i < len(out); i++ {
-//		if len(ret.Result) <= i || ret.Result[i] == nil {
-//			out[i] = reflect.Zero(fn.Type().Out(i))
-//		} else {
-//			typ := fn.Type().Out(i)
-//			val := reflect.New(typ)
-//			err = json.Unmarshal(ret.Result[i], val.Interface())
-//			if err != nil {
-//				return
-//			}
-//			out[i] = val.Elem()
-//		}
-//	}
 	return
 }
 
