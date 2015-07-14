@@ -53,28 +53,6 @@ func (p *Server) Serve(w http.ResponseWriter, r *http.Request) {
 	_, err = w.Write(data)
 }
 
-//func (p *Server) handle(name string, w http.ResponseWriter, r *http.Request) (data []byte, err error) {
-//	var status string
-//	var detail string
-
-//	result, err := p.call(name, w, r)
-//	if err == nil {
-//		status = StatusOK
-//	} else {
-//		status = StatusErr
-//		result = nil
-//		detail = NewErrRpcFailed(err).Error()
-//	}
-
-//	resp := NewResponse(status, detail, result)
-//	data, err = json.Marshal(resp)
-//	if err != nil {
-//		resp = NewResponse(StatusErr, NewErrRpcFailed(err).Error(), nil)
-//		data, err = json.Marshal(resp)
-//	}
-//	return
-//}
-
 func (p *Server) handle(name string, w http.ResponseWriter, r *http.Request) (data []byte, err error) {
 	var status string
 	var detail string
