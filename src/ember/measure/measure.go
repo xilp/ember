@@ -12,6 +12,16 @@ func (p *Measure) Sync(time int64) (ret MeasureData, err error) {
 	return
 }
 
+func (p *Measure) Status(mins int) (err error) {
+//	time := time.Now()
+//	ret, err := p.Sync(time)
+//	if err != nil {
+//		return
+//	}
+	return
+}
+
+
 func (p *Measure) Dump() MeasureData {
 	p.locker.Lock()
 	defer p.locker.Unlock()
