@@ -75,7 +75,7 @@ func (p *Server) handle(name string, w http.ResponseWriter, r *http.Request) (da
 	return
 }
 
-func (p *Server) call(name string, w http.ResponseWriter, r *http.Request) (ret []interface{}, err error) {
+func (p *Server) call(name string, w http.ResponseWriter, r *http.Request) (result map[string]interface{}, err error) {
 	fn, ok1 := p.fns[name]
 	fv, ok2 := p.fvs[name]
 	if !ok1 || !ok2 {
@@ -88,8 +88,22 @@ func (p *Server) call(name string, w http.ResponseWriter, r *http.Request) (ret 
 	if err != nil {
 		return
 	}
+	ret, err := fv.Invoke(fn.proto, data)
+	if err != nil {
+		return
+	}
+	result = format(fn, ret)
+	return
+}
 
-	ret, err = fv.Invoke(fn.proto, data)
+func format(fn *FnTrait, result []interface{}) (m map[string]interface{}) {
+	retArgs := fn.proto.ReturnNames
+	m = make(map[string]interface{})
+	for index, value := range retArgs {
+		if index < len(result) {
+			m[value] = result[index]
+		}
+	}
 	return
 }
 
@@ -173,18 +187,18 @@ type ErrRpcFailed struct {
 	err error
 }
 
-func NewResponse(status, detail string, result []interface{}) *Response {
+func NewResponse(status, detail string, result map[string]interface{}) *Response {
 	return &Response{status, detail, result}
 }
 
 type Response struct {
-	Status string        `json:"Status"`
-	Detail string        `json:"Detail"`
-	Result []interface{} `json:"Result"`
+	Status string        `json:"status"`
+	Detail string        `json:"detail"`
+	Result map[string]interface{} `json:"result"`
 }
 
 const (
-	StatusOK = "OK"
+	StatusOK = "ok"
 	StatusErr = "error"
 	HttpCodeOK = http.StatusOK
 	HttpCodeErr = 599
