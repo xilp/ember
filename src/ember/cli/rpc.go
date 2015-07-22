@@ -108,7 +108,7 @@ func NewRpcHub(args []string, sobj interface{}, cobj interface{}, path string) (
 	port, err := strconv.Atoi(portstr)
 	Check(err)
 
-	addr := host + ":" + portstr
+	addr := host + ":" + portstr + path
 
 	client := rpc.NewClient(addr)
 	err = client.Reg(cobj)
