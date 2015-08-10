@@ -27,8 +27,7 @@ func (p *Log) output(level int, msg string) {
 	if level < p.level {
 		return
 	}
-	LogLevel(level).String()
-	str := fmt.Sprintf("[%s] %s %s", time.Now().Format("2006-01-02 15:04:05"), level, msg)
+	str := fmt.Sprintf("[%s] %s %s", time.Now().Format("2006-01-02 15:04:05"), LogLevel(level).String(), msg)
 	p.w.Write([]byte(str))
 }
 
