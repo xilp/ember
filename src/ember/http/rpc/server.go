@@ -14,7 +14,9 @@ import (
 func (p *Server) Run(path string, port int) error {
 	mux := http.NewServeMux()
 	mux.HandleFunc(path, p.Serve)
-	return http.ListenAndServe(":" + strconv.Itoa(port), mux)
+	server := &http.Server{Addr: ":" + strconv.Itoa(port), Handler: mux,}
+	server.SetKeepAlivesEnabled(false)
+	return server.ListenAndServe()
 }
 
 func (p *Server) Serve(w http.ResponseWriter, r *http.Request) {
