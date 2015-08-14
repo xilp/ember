@@ -111,9 +111,9 @@ func (p *FnTrait) proxy(in []reflect.Value) (out []reflect.Value) {
 	}
 
 	var ret struct {
-		Status string
-		Detail string
-		Result map[string]json.RawMessage
+		Status string `json:"status"`
+		Detail string `json:"detail"`
+		Result map[string]json.RawMessage `json:"result"`
 	}
 	err = json.Unmarshal(body, &ret)
 	if err != nil {
