@@ -15,6 +15,27 @@ func (p *Client) List() (fns []FnProto) {
 	return p.fns.List()
 }
 
+func (p *Client) SimpleCall(name string, args []string) (ret []interface{}, err error) {
+	ret, err := p.Call("List", []string)
+	if err != nil {
+		return
+	}
+
+	fn := p.fns[name]
+	if fn == nil {
+		err = fmt.Errorf("%s not found", name)
+		return
+	}
+	in := make([][]byte, len(args))
+	for i, it := range args {
+		if fn.proto.ArgTypes[i] == "string" {
+			it = `"` + it + `"`
+		}
+		in[i] = []byte(it)
+	}
+	return fn.Call(in)
+}
+
 func (p *Client) Call(name string, args []string) (ret []interface{}, err error) {
 	fn := p.fns[name]
 	if fn == nil {
