@@ -1,10 +1,14 @@
 package rpc
 
 import (
+	"bytes"
+	"ember/measure"
+	"encoding/json"
 	"errors"
 	"fmt"
+	"net/http"
+	"io/ioutil"
 	"strings"
-	"ember/measure"
 )
 
 func (p *Client) Reg(obj interface{}) (err error) {
@@ -13,6 +17,33 @@ func (p *Client) Reg(obj interface{}) (err error) {
 
 func (p *Client) List() (fns []FnProto) {
 	return p.fns.List()
+}
+
+func (p *Client) SimpleCall(name string, args []string) (err error) {
+	kvs := make(map[string]string)
+	for _, arg := range args {
+		kv := strings.Split(arg, "=")
+		key := kv[0]
+		value := kv[1]
+		kvs[key] = value
+	}
+
+	postArgs, err := json.Marshal(kvs)
+	if err != nil {
+		return
+	}
+	resp, err := http.Post(p.addr+name, "text/json", bytes.NewReader(postArgs))
+	if err != nil {
+		return
+	}
+
+	defer resp.Body.Close()
+	data, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		return
+	}
+	fmt.Println(string(data))
+	return
 }
 
 func (p *Client) Call(name string, args []string) (ret []interface{}, err error) {

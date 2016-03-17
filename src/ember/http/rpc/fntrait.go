@@ -109,7 +109,6 @@ func (p *FnTrait) proxy(in []reflect.Value) (out []reflect.Value) {
 	if err != nil {
 		return
 	}
-
 	var ret struct {
 		Status string `json:"status"`
 		Detail string `json:"detail"`
