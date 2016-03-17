@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"ember/http/rpc"
 	"ember/cli"
-	"encoding/json"
 	"os"
+	"strings"
 )
 
 func main() {
@@ -28,22 +28,23 @@ func (p *EmberClient) Call(args []string) {
 	if len(args) == 0 {
 		return
 	}
-	ret, err := p.client.Call(args[0], args[1:])
-	cli.Check(err)
-
-	if len(ret) == 0 || ret == nil {
+	if len(args) == 2 {
+		err := p.client.SimpleCall(args[0], []string{})
+		cli.Check(err)
 		return
 	}
 
-	var obj interface{}
-	obj = ret
-	if len(ret) == 1 {
-		obj = ret[0]
+	if len(args) > 2 {
+		for _, arg := range args[1:] {
+			if !strings.Contains(arg, "=") {
+				fmt.Println("usage: <bin> func [arg1]=\"\" [arg2]=\"\" ...")
+				break
+			}
+		}
 	}
 
-	data, err := json.MarshalIndent(obj, "", "    ")
+	err := p.client.SimpleCall(args[0], args[1:])
 	cli.Check(err)
-	fmt.Println(string(data))
 }
 
 func (p *EmberClient) help(fns []rpc.FnProto) {
@@ -68,9 +69,13 @@ func (p *EmberClient) help(fns []rpc.FnProto) {
 
 func NewEmberClient(args []string, path string) (p *EmberClient) {
 	host, args := cli.PopArg("host", "127.0.0.1", args)
-	portStr, args := cli.PopArg("port", "8088", args)
-
-	addr := host + ":" + portStr + path
+	portStr, args := cli.PopArg("port", "", args)
+	var addr string
+	if portStr != "" {
+		addr = host + path
+	} else {
+		addr = host + ":" + portStr + path
+	}
 
 	client := rpc.NewClient(addr)
 	p = &EmberClient{client, path, args}
