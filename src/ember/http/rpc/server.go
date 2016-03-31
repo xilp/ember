@@ -69,10 +69,14 @@ func (p *Server) handle(name string, w http.ResponseWriter, r *http.Request) (da
 	}
 
 	resp := NewResponse(status, detail, result)
-	data, err = json.Marshal(resp)
-	if err != nil {
+	data, eom := json.Marshal(resp)
+	if eom != nil {
+		err = eom
 		resp = NewResponse(StatusErr, NewErrRpcFailed(err).Error(), nil)
-		data, err = json.Marshal(resp)
+		data, eom = json.Marshal(resp)
+		if eom != nil {
+			err = eom
+		}
 	}
 	return
 }
