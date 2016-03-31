@@ -1,80 +1,22 @@
 package rpc
 
 import (
-	"errors"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
 	"net/http"
-	"reflect"
 	"strconv"
 	"strings"
 	"time"
 	"ember/measure"
 )
 
-var ErrUnknown = errors.New("unknown error type on call api")
-
-func (p *Server) List() (apis map[string][]string, err error) {
-	apis = p.trait
-	return
-}
-
-func (p *Server) Run(port int) error {
+func (p *Server) Run(path string, port int) error {
 	mux := http.NewServeMux()
-	mux.HandleFunc("/", p.Serve)
-	return http.ListenAndServe(":" + strconv.Itoa(port), mux)
-}
-
-func (p *Server) Reg(api ApiTrait) (err error) {
-	return p.reg("", api, api.Trait())
-}
-
-func (p *Server) reg(prefix string, api interface{}, trait map[string][]string) (err error) {
-	typ := reflect.TypeOf(api)
-	for i := 0; i < typ.NumMethod(); i++ {
-		method := typ.Method(i)
-		name := prefix + method.Name
-		if _, ok := trait[method.Name]; !ok {
-			continue
-		}
-		fn := method.Func.Interface()
-		err = p.create(name, api, fn)
-		if err != nil {
-			return
-		}
-		p.fns[name] = reflect.ValueOf(fn)
-		p.objs[name] = api
-		p.trait[name] = trait[method.Name]
-	}
-	return
-}
-
-func (p *Server) create(name string, api interface{}, fn interface{}) (err error) {
-	fv := reflect.ValueOf(fn)
-
-	err = callable(fv)
-	if err != nil {
-		return
-	}
-
-	nOut := fv.Type().NumOut()
-	if nOut == 0 || fv.Type().Out(nOut - 1).Kind() != reflect.Interface {
-		err = NewErrRpcServer(fmt.Errorf("%s return final output param must be error interface", name))
-		return
-	}
-
-	_, b := fv.Type().Out(nOut - 1).MethodByName("Error")
-	if !b {
-		err = NewErrRpcServer(fmt.Errorf("%s return final output param must be error interface", name))
-		return
-	}
-
-	if _, ok := p.fns[name]; ok {
-		err = NewErrRpcServer(fmt.Errorf("%s has registered", name))
-		return
-	}
-	return
+	mux.HandleFunc(path, p.Serve)
+	server := &http.Server{Addr: ":" + strconv.Itoa(port), Handler: mux,}
+	server.SetKeepAlivesEnabled(false)
+	return server.ListenAndServe()
 }
 
 func (p *Server) Serve(w http.ResponseWriter, r *http.Request) {
@@ -85,138 +27,144 @@ func (p *Server) Serve(w http.ResponseWriter, r *http.Request) {
 	url := strings.Split(strings.Trim(r.URL.Path, "/"), "/")
 	name := url[len(url) - 1]
 
+	var err error
 	defer func() {
 		end := time.Now().UnixNano()
-		p.measure.Record("api.cost.handle." + name, cost - begin)
-		p.measure.Record("api.cost.all." + name, end - begin)
-		p.measure.Record("api.response." + name, int64(cb))
+		p.measure.Record("api.cost.handle." + name, (cost - begin) / 1000)
+		p.measure.Record("api.cost.all." + name, (end - begin) / 1000)
+		p.measure.Record("api.resp." + name, int64(cb))
+		if err != nil {
+			p.measure.Record("api.error." + name, 0)
+		}
 	}()
 
-	var status string
-	var detail string
-	result, err := p.handle(name, w, r)
+	var data []byte
+	data, err = p.handle(name, w, r)
 	cost = time.Now().UnixNano()
-	if err == nil {
-		status = StatusOK
-	} else {
-		status = StatusErr
-		result = nil
-		detail = err.Error()
-	}
-
-	resp := NewResponse(status, detail, result)
-	ret, err := json.Marshal(resp)
-	if err != nil {
-		if detail != "" {
-			panic("error marshal: must OK")
-		}
-		resp = NewResponse(StatusErr, NewErrRpcServer(err).Error(), nil)
-		ret, err = json.Marshal(resp)
-		if err != nil {
-			panic("error marshal: must OK, too")
-		}
-	}
-
-	cb = len(ret)
+	cb = len(data)
 
 	h := w.Header()
 	h.Set("Content-Type", "text/json")
 
-	if resp.Status == StatusOK {
+	if err == nil {
 		w.WriteHeader(HttpCodeOK)
 	} else {
 		w.WriteHeader(HttpCodeErr)
 	}
 
-	_, err = w.Write(ret)
-	// TODO: log here
+	_, err = w.Write(data)
 }
 
-func (p *Server) handle(name string, w http.ResponseWriter, r *http.Request) (result []interface{}, err error) {
+func (p *Server) handle(name string, w http.ResponseWriter, r *http.Request) (data []byte, err error) {
+	var status string
+	var detail string
+
+	result, err := p.call(name, w, r)
+	if err == nil {
+		status = StatusOK
+	} else {
+		status = StatusErr
+		result = nil
+		detail = NewErrRpcFailed(err).Error()
+	}
+
+	resp := NewResponse(status, detail, result)
+	data, eom := json.Marshal(resp)
+	if eom != nil {
+		err = eom
+		resp = NewResponse(StatusErr, NewErrRpcFailed(err).Error(), nil)
+		data, eom = json.Marshal(resp)
+		if eom != nil {
+			err = eom
+		}
+	}
+	return
+}
+
+func (p *Server) call(name string, w http.ResponseWriter, r *http.Request) (result map[string]interface{}, err error) {
+	fn, ok1 := p.fns[name]
+	fv, ok2 := p.fvs[name]
+	if !ok1 || !ok2 {
+		err = fmt.Errorf("%s not found", name)
+		return
+	}
+
 	defer r.Body.Close()
 	data, err := ioutil.ReadAll(r.Body)
 	if err != nil {
 		return
 	}
-
-	if len(data) == 0 {
-		return p.invoke(name, nil)
-	}
-	var in map[string]json.RawMessage
-	err = json.Unmarshal(data, &in)
+	ret, err := fv.Invoke(fn.proto, data)
 	if err != nil {
 		return
 	}
-
-	return p.invoke(name, in)
+	result = format(fn, ret)
+	return
 }
 
-func (p *Server) invoke(name string, args map[string]json.RawMessage) (ret []interface{}, err error) {
-	fn, ok := p.fns[name]
-
-	if !ok {
-		err = NewErrRpcServer(fmt.Errorf("api %s not registered", name))
-		return
-	}
-	if len(args) + 1 != fn.Type().NumIn() {
-		err = NewErrRpcServer(fmt.Errorf("api %s params count unmatched", name))
-		return
-	}
-
-	in := make([]reflect.Value, fn.Type().NumIn())
-	in[0] = reflect.ValueOf(p.objs[name])
-
-	for i, argName := range p.trait[name] {
-		if _, ok := args[argName]; !ok {
-			return nil, NewErrRpcServer(fmt.Errorf("api %s arg %s missing", argName))
-		} else {
-			typ := fn.Type().In(i + 1)
-			val := reflect.New(typ)
-			err = json.Unmarshal(args[argName], val.Interface())
-			if err != nil {
-				return nil, NewErrRpcServer(err)
-			}
-			in[i + 1] = val.Elem()
+func format(fn *FnTrait, result []interface{}) (m map[string]interface{}) {
+	retArgs := fn.proto.ReturnNames
+	m = make(map[string]interface{})
+	for index, value := range retArgs {
+		if index < len(result) {
+			m[value] = result[index]
 		}
 	}
+	return
+}
 
-	out, err := call(fn, in)
+func (p *Server) Uptime() (start int64, dura int64, err error) {
+	now := time.Now().UnixNano()
+	start = p.start / int64(time.Second)
+	dura = (now - p.start) / int64(time.Second)
+	return
+}
+
+func (p *Server) List() (protos []FnProto, err error) {
+	protos = p.fns.List()
+	return
+}
+
+func (p *Server) Reg(sobj interface{}, cobj interface{}) (err error) {
+	return p.reg("", sobj, cobj)
+}
+
+func (p *Server) reg(prefix string, sobj interface{}, cobj interface{}) (err error) {
+	fns := NewFnTraits(cobj)
+	fvs, err := NewFnValues(sobj, fns)
 	if err != nil {
-		return nil, err
+		return
 	}
-
-	ret = make([]interface{}, len(out))
-	for i := 0; i < len(ret); i++ {
-		ret[i] = out[i].Interface()
-	}
-
-	pv := out[len(out) - 1].Interface()
-	if pv != nil {
-		if e, ok := pv.(error); ok {
-			err = NewErrRpcServer(e)
-		} else if e, ok := pv.(string); ok {
-			err = NewErrRpcServer(fmt.Errorf(e))
+	for origin, fn := range fns {
+		name := prefix + origin
+		if _, ok := p.fns[name]; ok {
+			err = fmt.Errorf("%s has registered", name)
+			return
 		}
-		return nil, err
+		fn.Prefix(prefix)
+		p.fns[name] = fn
+		if _, ok := fvs[origin]; !ok {
+			continue
+		}
+		p.fvs[name] = fvs[origin]
 	}
-
-	return ret, nil
+	return
 }
 
 func NewServer() (p *Server) {
 	p = &Server {
-		make(map[string]reflect.Value),
-		make(map[string]interface{}),
-		make(map[string][]string),
+		make(FnTraits),
+		make(FnValues),
 		measure.NewMeasure(time.Second * 60, time.Second * 60 * 60 * 24),
+		time.Now().UnixNano(),
 	}
 
-	err := p.reg("Measure.", p.measure, MeasureTrait)
+	err := p.reg(MeasurePrefix, p.measure, &Measure{})
 	if err != nil {
 		panic(err)
 	}
 
-	err = p.reg("Api.", p, BuiltinTrait)
+	err = p.reg(BuiltinPrefix, p, &Builtin{})
 	if err != nil {
 		panic(err)
 	}
@@ -224,85 +172,40 @@ func NewServer() (p *Server) {
 }
 
 type Server struct {
-	fns map[string]reflect.Value
-	objs map[string]interface{}
-	trait map[string][]string
+	fns FnTraits
+	fvs FnValues
 	measure *measure.Measure
+	start int64
 }
 
-var MeasureTrait = map[string][]string {
-	"Sync": {"time"},
+func (p *ErrRpcFailed) Error() string {
+	return "[rpc server] " + p.err.Error()
 }
-var BuiltinTrait = map[string][]string {
-	"List": {},
+
+func NewErrRpcFailed(err error) error {
+	if _, ok := err.(*ErrCallFailed); ok {
+		return err
+	}
+	return &ErrRpcFailed{err}
+}
+
+type ErrRpcFailed struct {
+	err error
+}
+
+func NewResponse(status, detail string, result map[string]interface{}) *Response {
+	return &Response{status, detail, result}
+}
+
+type Response struct {
+	Status string        `json:"status"`
+	Detail string        `json:"detail"`
+	Result map[string]interface{} `json:"result"`
 }
 
 const (
-	StatusOK = "OK"
+	StatusOK = "ok"
 	StatusErr = "error"
 	HttpCodeOK = http.StatusOK
 	HttpCodeErr = 599
 )
-
-func NewResponse(status, detail string, result []interface{}) *Response {
-	return &Response {
-		status,
-		detail,
-		result,
-	}
-}
-
-type Response struct {
-	Status string `json:"status"`
-	Detail string `json:"detail"`
-	Result []interface{} `json:"result"`
-}
-
-func callable(fn reflect.Value) (err error) {
-	defer func() {
-		if e := recover(); e != nil {
-			if r, ok := e.(error); ok {
-				err = NewErrRpcServer(r)
-			} else if s, ok := e.(string); ok {
-				err = NewErrRpcServer(errors.New(s))
-			} else {
-				err = NewErrRpcServer(ErrUnknown)
-			}
-		}
-	}()
-	fn.Type().NumIn()
-	return
-}
-
-func call(fn reflect.Value, in []reflect.Value) (out []reflect.Value, err error) {
-	defer func() {
-		e := recover()
-		if e != nil {
-			if r, ok := e.(error); ok {
-				err = NewErrRpcServer(r)
-			} else if s, ok := e.(string); ok {
-				err = NewErrRpcServer(errors.New(s))
-			} else {
-				err = NewErrRpcServer(errors.New("unknown error type on call api"))
-			}
-		}
-	}()
-	out = fn.Call(in)
-	return
-}
-
-type ErrRpcServer struct {
-	err error
-}
-
-func NewErrRpcServer(e error) *ErrRpcServer {
-	return &ErrRpcServer{e}
-}
-
-func (p *ErrRpcServer) Error() string {
-	return "rpc server error: " + p.err.Error()
-}
-
-type ApiTrait interface {
-	Trait() map[string][]string
-}

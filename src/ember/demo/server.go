@@ -7,22 +7,18 @@ import (
 )
 
 func main() {
-	hub := cli.NewRpcHub(os.Args[1:], &Server{}, &Client{})
+	server := func() (interface{}, error) {
+		return &Server{}, nil
+	}
+	hub := cli.NewRpcHub(os.Args[1:], server, &Client{}, "/")
 	hub.Run()
 }
 
 type Client struct {
-	Echo func(msg string) (echo string, err error)
+	Echo func(msg string) (echo string, err error) `args:"msg" return:"echo"`
 	Panic func() (err error)
 	Error func() (err error)
-}
-
-func (p *Server) Trait() map[string][]string {
-	return map[string][]string {
-		"Echo": {"msg"},
-		"Panic": {},
-		"Error": {},
-	}
+	Foo func(key string) (ret [][][]string, err error) `args:"key" return:"ret"`
 }
 
 func (p *Server) Echo(msg string) (echo string, err error) {
@@ -37,6 +33,11 @@ func (p *Server) Panic() (err error) {
 
 func (p *Server) Error() (err error) {
 	err = errors.New("error as expected")
+	return
+}
+
+func (p *Server) Foo(key string) (ret [][][]string, err error) {
+	ret = [][][]string{{{"foo"}}}
 	return
 }
 

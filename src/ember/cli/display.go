@@ -1,4 +1,4 @@
-package base
+package cli
 
 import (
 	"strconv"
@@ -16,7 +16,7 @@ func Ustr(u uint32, width int) string {
 func Lstr(l int64, width int) string {
 	s := strconv.FormatInt(l, 10)
 	if len(s) < width {
-		s = strings.Repeat(" ", width - len(s)) + s
+		s = strings.Repeat(" ", width-len(s)) + s
 	}
 	return Lpad(s, width)
 }
@@ -24,21 +24,21 @@ func Lstr(l int64, width int) string {
 func Lustr(l uint64, width int) string {
 	s := strconv.FormatUint(l, 10)
 	if len(s) < width {
-		s = strings.Repeat(" ", width - len(s)) + s
+		s = strings.Repeat(" ", width-len(s)) + s
 	}
 	return Lpad(s, width)
 }
 
 func Lpad(s string, width int) string {
 	if len(s) < width {
-		s = strings.Repeat(" ", width - len(s)) + s
+		s = strings.Repeat(" ", width-len(s)) + s
 	}
 	return s
 }
 
 func Rpad(s string, width int) string {
 	if len(s) < width {
-		s += strings.Repeat(" ", width - len(s))
+		s += strings.Repeat(" ", width-len(s))
 	}
 	return s
 }
@@ -73,4 +73,11 @@ func Nms(nano int64, width int) string {
 		return Istr(ms, width) + "MS"
 	}
 	return Istr(ms / 1000, width) + "S"
+}
+
+func Tps(val int64, ns int64) int64 {
+	if ns == 0 || val == 0 {
+		return 0
+	}
+	return val * 10000 / (ns / 100000)
 }

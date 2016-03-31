@@ -85,3 +85,30 @@ func PopArg(name string, def string, args []string) (value string, repacked []st
 	}
 	return def, args
 }
+
+func SplitArgs(args []string, target ...string) (result []string, repacked []string) {
+	repacked = args
+	for i, arg := range args {
+		found := false
+		for _, name := range target {
+			if arg == "-"  + name && (i + 1 < len(args)) {
+				value := args[i + 1]
+				result = append(result, value)
+				repacked = append(args[:i], args[i + 2:]...)
+				found = true
+				break
+			}
+			if strings.HasPrefix(arg, "-" + name + "=") {
+				value := args[i][len(name) + 2:]
+				result = append(result, value)
+				repacked = append(args[:i], args[i + 1:]...)
+				found = true
+				break
+			}
+		}
+		if !found {
+			break
+		}
+	}
+	return
+}
