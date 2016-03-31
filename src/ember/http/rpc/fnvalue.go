@@ -35,7 +35,6 @@ func (p FnValue) Invoke(proto FnProto, data []byte) (ret []interface{}, err erro
 			return
 		}
 	}
-
 	args := make([][]byte, len(proto.ArgNames))
 	for i, name := range proto.ArgNames {
 		arg, ok := in[name]
