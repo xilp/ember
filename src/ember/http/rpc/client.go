@@ -53,7 +53,7 @@ func (p *Client) Call(name string, args []string) (ret []interface{}, err error)
 		return
 	}
 	if len(args) != len(fn.proto.ArgTypes) {
-		err = fmt.Errorf("%s arg count not match", name)
+		err = fmt.Errorf("%s args count not match", name)
 		return
 	}
 	in := make([][]byte, len(args))
