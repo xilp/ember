@@ -53,6 +53,7 @@ func (p *Server) Serve(w http.ResponseWriter, r *http.Request) {
 	}
 
 	_, err = w.Write(data)
+	_, err = w.Write([]byte("\n"))
 }
 
 func (p *Server) handle(name string, w http.ResponseWriter, r *http.Request) (data []byte, err error) {
@@ -85,7 +86,7 @@ func (p *Server) call(name string, w http.ResponseWriter, r *http.Request) (resu
 	fn, ok1 := p.fns[name]
 	fv, ok2 := p.fvs[name]
 	if !ok1 || !ok2 {
-		err = fmt.Errorf("%s not found", name)
+		err = fmt.Errorf("api '%s' not found", name)
 		return
 	}
 

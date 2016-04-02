@@ -9,18 +9,10 @@ func NewFnProto(fn reflect.Value, tag reflect.StructTag, name string) (p FnProto
 	p = FnProto{Name: name}
 	typ := fn.Elem().Type()
 	for i := 0; i < typ.NumIn(); i++ {
-		tn := typ.In(i).Name()
-		if tn == "" {
-			tn = typ.In(i).Kind().String()
-		}
-		p.ArgTypes = append(p.ArgTypes, tn)
+		p.ArgTypes = append(p.ArgTypes, tname(typ.In(i)))
 	}
 	for i := 0; i < typ.NumOut(); i++ {
-		tn := typ.Out(i).Name()
-		if tn == "" {
-			tn = typ.Out(i).Kind().String()
-		}
-		p.ReturnTypes = append(p.ReturnTypes, tn)
+		p.ReturnTypes = append(p.ReturnTypes, tname(typ.Out(i)))
 	}
 
 	args := tag.Get("args")
@@ -49,4 +41,44 @@ type FnProto struct {
 	ArgTypes    []string "arg_types"
 	ReturnNames []string "return_names"
 	ReturnTypes []string "return_types"
+}
+
+func tname(typ reflect.Type) (tn string) {
+	kind := typ.Kind()
+	if kind == reflect.Slice || kind == reflect.Array {
+		tn = tname(typ.Elem()) + "[]"
+		return
+	}
+	if kind == reflect.Map {
+		tn = "Map<" + tname(typ.Key()) + ", " + tname(typ.Elem()) + ">"
+		return
+	}
+	if kind == reflect.Ptr {
+		tn = tname(typ.Elem())
+		return
+	}
+	if kind == reflect.Struct {
+		tn = sname(typ)
+		return
+	}
+	tn = typ.Name()
+	if tn != "" {
+		return
+	}
+	tn = kind.String()
+	return
+}
+
+func sname(typ reflect.Type) (sn string) {
+	for i := 0; i < typ.NumField(); i++ {
+		field := typ.Field(i)
+		if field.Name[0] < 'A' || field.Name[0] > 'Z' {
+			continue
+		}
+		sn += tname(field.Type) + " " + field.Name + ", "
+	}
+	if len(sn) == 0 {
+		return "{}"
+	}
+	return typ.Name() + "{" + sn[0: len(sn) - 2] + "}"
 }
