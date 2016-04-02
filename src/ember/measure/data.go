@@ -106,7 +106,7 @@ func (p *SpanData) Dump(w io.Writer, readable bool) (err error) {
 	if p.Time == 0 {
 		return
 	}
-	_, err = w.Write([]byte(fmt.Sprintf("[Time Stamp: %d]\n", p.Time)))
+	_, err = w.Write([]byte(fmt.Sprintf("[Time Stamp: %d]\n", p.Time / 1e9)))
 	if err != nil {
 		return
 	}

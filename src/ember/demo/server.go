@@ -7,10 +7,7 @@ import (
 )
 
 func main() {
-	server := func() (interface{}, error) {
-		return &Server{}, nil
-	}
-	hub := cli.NewRpcHub(os.Args[1:], server, &Client{}, "/")
+	hub := cli.NewRpcHub(os.Args[1:], NewServer, &Client{}, "/")
 	hub.Run()
 }
 
@@ -33,6 +30,11 @@ func (p *Server) Panic() (err error) {
 
 func (p *Server) Error() (err error) {
 	err = errors.New("error as expected")
+	return
+}
+
+func NewServer(args []string) (p interface{}, err error) {
+	p = &Server{}
 	return
 }
 

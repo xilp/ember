@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"net/http"
 	"os"
-	"reflect"
 	"strconv"
 	"ember/http/rpc"
 )
@@ -27,16 +26,11 @@ func (p *RpcHub) Mux() *http.ServeMux {
 	return p.mux
 }
 
-func (p *RpcHub) CmdRun([]string) {
-	sobj := p.sobj
-	if reflect.TypeOf(sobj).Kind() == reflect.Func {
-		out := reflect.ValueOf(sobj).Call([]reflect.Value{})
-		err := rpc.IsError{out[len(out) - 1].Interface()}.Check()
-		Check(err)
-		sobj = out[0].Interface()
-	}
+func (p *RpcHub) CmdRun(args []string) {
+	sobj, err := p.sfunc(args)
+	Check(err)
 	rpc := rpc.NewServer()
-	err := rpc.Reg(sobj, p.cobj)
+	err = rpc.Reg(sobj, p.cobj)
 	Check(err)
 	err = rpc.Run(p.path, p.port)
 	Check(err)
@@ -102,7 +96,7 @@ func (p *RpcHub) CmdStatus(args []string) {
 	Check(err)
 }
 
-func NewRpcHub(args []string, sobj interface{}, cobj interface{}, path string) (p *RpcHub)  {
+func NewRpcHub(args []string, sfunc NewServerFunc, cobj interface{}, path string) (p *RpcHub)  {
 	host, args := PopArg("host", DefaultHost, args)
 	portstr, args := PopArg("port", DefaultPort, args)
 	port, err := strconv.Atoi(portstr)
@@ -114,7 +108,7 @@ func NewRpcHub(args []string, sobj interface{}, cobj interface{}, path string) (
 	err = client.Reg(cobj)
 	Check(err)
 
-	p = &RpcHub{host, port, args, NewCmds(), sobj, cobj, client, http.NewServeMux(), path}
+	p = &RpcHub{host, port, args, NewCmds(), sfunc, cobj, client, http.NewServeMux(), path}
 
 	p.cmds.Reg("run", "run server", p.CmdRun)
 	p.cmds.Reg("list", "list api from local info", p.CmdList)
@@ -129,14 +123,14 @@ type RpcHub struct {
 	port int
 	args []string
 	cmds *Cmds
-	sobj interface{}
+	sfunc NewServerFunc
 	cobj interface{}
 	client *rpc.Client
 	mux *http.ServeMux
 	path string
 }
 
-type NewServerFunc func()(interface{}, error)
+type NewServerFunc func(args []string)(interface{}, error)
 
 const DefaultHost = "127.0.0.1"
 const DefaultPort = "8080"

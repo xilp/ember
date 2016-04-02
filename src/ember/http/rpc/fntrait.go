@@ -13,17 +13,17 @@ import (
 )
 
 func (p FnTraits) List() (fns []FnProto) {
-	api := []string{}
 	builtin := []string{}
+	api := []string{}
 	for name, _ := range p {
-		if strings.Index(name, ".") < 0 {
-			api = append(api, name)
-		} else {
+		if strings.Index(name, ".") >= 0 {
 			builtin = append(builtin, name)
+		} else {
+			api = append(api, name)
 		}
 	}
-	sort.Strings(api)
 	sort.Strings(builtin)
+	sort.Strings(api)
 
 	for _, name := range builtin {
 		fns = append(fns, p[name].Proto())
