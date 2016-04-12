@@ -24,6 +24,14 @@ func (p *Cmds) Reg(cmd string, help string, fun func([]string)) {
 	p.cmds[cmd] = fun
 }
 
+func (p *Cmds) Unreg(cmd string) (help string, fun func([]string)) {
+	help = p.help[cmd]
+	delete(p.help, cmd)
+	fun = p.cmds[cmd]
+	delete(p.cmds, cmd)
+	return
+}
+
 func (p *Cmds) Sub(cmd string, help string) *Cmds {
 	p.help[cmd] = help
 	path := p.path + "." + cmd
