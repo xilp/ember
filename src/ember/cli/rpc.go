@@ -18,6 +18,10 @@ func (p *RpcHub) Run() {
 	p.cmds.Run(p.args)
 }
 
+func (p *RpcHub) RpcClient() *rpc.Client {
+	return p.client
+}
+
 func (p *RpcHub) Cmds() *Cmds {
 	return p.cmds
 }
