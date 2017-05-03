@@ -67,7 +67,7 @@ func (p *Cmds) Loop() {
 			os.Exit(0)
 		}
 
-		if cmd == "help" || cmd == "?" {
+		if _, ok := HelpCmds[cmd]; ok {
 			p.Help(false)
 			println()
 			continue
@@ -76,6 +76,7 @@ func (p *Cmds) Loop() {
 		p.Run(strings.Split(cmd, " "))
 	}
 }
+
 func (p *Cmds) Help(simple bool) {
 	display := func(mark bool, cmd string, help string) {
 		if mark {
@@ -89,7 +90,7 @@ func (p *Cmds) Help(simple bool) {
 	if !simple {
 		display(false, ".", "redo lastest cmd")
 		display(false, "..", "back to uplevel")
-		display(false, "help", "display help message. '?' will also do")
+		display(false, "-help", "display help message. '-?' will also do")
 		display(false, "exit", "quit")
 		println()
 	}
@@ -117,7 +118,7 @@ func (p *Cmds) Run(cmds []string) {
 		child.Run(cmds)
 		return
 	}
-	if cmd == "help" || cmd == "?" || cmd == "-help" || cmd == "--help" {
+	if _, ok := HelpCmds[cmd]; ok {
 		p.Help(true)
 		return
 	}
@@ -126,3 +127,5 @@ func (p *Cmds) Run(cmds []string) {
 	}
 	return
 }
+
+var HelpCmds = map[string]string{"-help": "", "--help": "", "-?": "", "--?": ""}
