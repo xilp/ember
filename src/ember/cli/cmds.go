@@ -128,4 +128,4 @@ func (p *Cmds) Run(cmds []string) {
 	return
 }
 
-var HelpCmds = map[string]string{"-help": "", "--help": "", "-?": "", "--?": ""}
+var HelpCmds = map[string]string{"--help": "", "--?": "", "-help": "", "-?": "", "help": "", "?": ""}
