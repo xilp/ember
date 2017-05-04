@@ -71,10 +71,8 @@ func TestMeasureData(t *testing.T) {
 		t.Fatal("wrong", c)
 	}
 
-	c.Print(true)
-
+	// TODO
 	//func (p *MeasureData) Padding(count int) {
-
 	//func (p *MeasureData) Merge(x *MeasureData) MeasureData {
 	//func (p *MeasureData) After(time int64) MeasureData {
 }
