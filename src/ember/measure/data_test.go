@@ -2,6 +2,7 @@ package measure
 
 import (
 	"testing"
+	"time"
 )
 
 func TestSpecData(t *testing.T) {
@@ -16,10 +17,11 @@ func TestSpecData(t *testing.T) {
 
 func TestSpanData(t *testing.T) {
 	d := NewSpanData()
+	d.Time = time.Now().UnixNano()
+	d.Record("b", 15)
 	d.Record("a", 1)
 	d.Record("a", 9)
 	d.Record("a", 5)
-	d.Record("b", 15)
 
 	c := d.Copy()
 	c.Record("b", 7)
@@ -68,6 +70,8 @@ func TestMeasureData(t *testing.T) {
 	if last.Count != 2 {
 		t.Fatal("wrong", c)
 	}
+
+	c.Print(true)
 
 	//func (p *MeasureData) Padding(count int) {
 

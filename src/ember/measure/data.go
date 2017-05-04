@@ -4,10 +4,15 @@ import (
 	"fmt"
 	"io"
 	"math"
-
-	// TODO: readable
-	//"ember/base"
+	"os"
+	"sort"
+	"time"
+	"ember/base"
 )
+
+func (p *MeasureData) Print(readable bool) (err error) {
+	return p.Dump(os.Stdout, readable)
+}
 
 func (p *MeasureData) Dump(w io.Writer, readable bool) (err error) {
 	for _, it := range *p {
@@ -102,16 +107,33 @@ func NewMeasureData(count int) MeasureData {
 
 type MeasureData []*SpanData
 
+func (p *SpanData) Print(readable bool) (err error) {
+	return p.Dump(os.Stdout, readable)
+}
+
 func (p *SpanData) Dump(w io.Writer, readable bool) (err error) {
 	if p.Time == 0 {
 		return
 	}
-	_, err = w.Write([]byte(fmt.Sprintf("[Time Stamp: %d]\n", p.Time / 1e9)))
+	if readable {
+		_, err = w.Write([]byte(fmt.Sprintf("[Time Stamp: %d (%s)]\n", p.Time / 1e9, time.Unix(0, p.Time).Format(TimeFormat))))
+	} else {
+		_, err = w.Write([]byte(fmt.Sprintf("@%d\n", p.Time / 1e9)))
+	}
 	if err != nil {
 		return
 	}
-	for k, v := range p.Data {
-		_, err = w.Write([]byte(fmt.Sprintf("%s %s\n", k, v.Dump(readable))))
+	keys := []string{}
+	for k, _ := range p.Data {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+	for _, k := range keys {
+		if readable {
+			_, err = w.Write([]byte(fmt.Sprintf("%s: %s\n", k, p.Data[k].Dump(readable))))
+		} else {
+			_, err = w.Write([]byte(fmt.Sprintf("%s %s\n", k, p.Data[k].Dump(readable))))
+		}
 		if err != nil {
 			return
 		}
@@ -162,7 +184,8 @@ func (p *SpecData) Dump(readable bool) string {
 	}
 
 	if readable {
-		return fmt.Sprintf("%d %d %d %d", p.Min, p.Max, p.Count, avg)
+		return fmt.Sprintf("min:%s max:%s cnt:%s avg:%s",
+			base.Nkmg(p.Min, 4), base.Nkmg(p.Max, 4), base.Nkmg(p.Count, 4), base.Nkmg(avg, 4))
 	} else {
 		return fmt.Sprintf("%d %d %d %d", p.Min, p.Max, p.Count, avg)
 	}
@@ -182,3 +205,5 @@ func NewSpecData() *SpecData {
 type SpecData struct {
 	Max, Min, Sum, Count int64
 }
+
+const TimeFormat = "2006-01-02/15:04:05"

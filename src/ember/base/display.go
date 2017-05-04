@@ -51,6 +51,12 @@ func shrink(number int64, depth int, max int64, step int) (n int64, d int) {
 	return number, depth
 }
 
+func Nkmg(number int64, width int) string {
+	n, d := shrink(number, 0, 10000, 1000)
+	units := []string{" ", "K", "M", "G", "T", "P"}
+	return Istr(int(n), width) + units[d]
+}
+
 func Bkmg(number int64, width int) string {
 	n, d := shrink(number, 0, 10000, 1024)
 	units := []string{"B", "K", "M", "G", "T", "P"}
