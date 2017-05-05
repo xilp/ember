@@ -63,7 +63,7 @@ func (p *Cmds) Loop() {
 		if cmd == ".." {
 			break
 		}
-		if cmd == "exit" {
+		if _, ok := ExitCmds[cmd]; ok {
 			os.Exit(0)
 		}
 
@@ -129,3 +129,4 @@ func (p *Cmds) Run(cmds []string) {
 }
 
 var HelpCmds = map[string]string{"--help": "", "--?": "", "-help": "", "-?": "", "help": "", "?": ""}
+var ExitCmds = map[string]string{"exit": "", "quit": ""}

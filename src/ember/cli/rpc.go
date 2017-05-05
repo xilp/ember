@@ -9,13 +9,14 @@ import (
 	"ember/http/rpc"
 )
 
-func (p *RpcHub) Run() {
+func (p *RpcHub) Run() (err error) {
 	if len(p.args) == 0 {
 		Errln("usage:\n  <bin> [-host=" + DefaultHost + "] [-port=" + DefaultPort + "] command [args]\n\ncommand:")
 		p.cmds.Help(true)
-		os.Exit(1)
+		return ErrWrongArgs
 	}
 	p.cmds.Run(p.args)
+	return
 }
 
 func (p *RpcHub) RpcClient() *rpc.Client {
