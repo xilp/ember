@@ -8,7 +8,8 @@ import (
 
 func main() {
 	hub := cli.NewRpcHub(os.Args[1:], NewServer, &Client{}, "/")
-	hub.Run()
+	err := hub.Run()
+	cli.Check(err)
 }
 
 type Client struct {

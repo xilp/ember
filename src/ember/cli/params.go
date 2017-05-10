@@ -1,9 +1,10 @@
 package cli
 
 import (
+	"bytes"
+	"errors"
 	"flag"
 	"fmt"
-	"os"
 	"strings"
 )
 
@@ -35,34 +36,44 @@ func AutoComplete(args []string, flags ...string) []string {
 	return ret
 }
 
-func ParseFlag(flag *flag.FlagSet, args []string, flags ...string) {
-	display := func() {
+func NewFlagSet() *flag.FlagSet {
+	return flag.NewFlagSet("", flag.ContinueOnError)
+}
+
+func ParseFlag(flag *flag.FlagSet, args []string, flags ...string) (help string, err error) {
+	display := func() string {
+		buf := bytes.NewBuffer(nil)
+
 		if ArgsCount(flag) == 0 {
-			fmt.Println("no args need")
-			return
+			fmt.Fprintln(buf, NoArgsNeed)
+			return buf.String()
 		}
 
+		flag.SetOutput(buf)
 		flag.PrintDefaults()
+		flag.SetOutput(nil)
 
-		fmt.Println()
-		fmt.Print("shortcut:")
+		fmt.Fprintf(buf, "\nshortcut:")
 		for _, it := range flags {
-			fmt.Print(" <", it, ">")
+			fmt.Fprint(buf, " <", it, ">")
 		}
-		fmt.Println()
+		fmt.Fprintln(buf)
+		return buf.String()
 	}
+	help = display()
 
 	if len(args) > 0 && (args[len(args) - 1] == "help" || args[len(args) - 1] == "?") {
-		display()
-		os.Exit(1)
+		err = ErrWrongArgs
+		return
 	}
 
 	args = AutoComplete(args, flags...)
-	err := flag.Parse(args)
-	if err != nil {
-		display()
-		os.Exit(1)
-	}
+
+	buf := bytes.NewBuffer(nil)
+	flag.SetOutput(buf)
+	err = flag.Parse(args)
+	flag.SetOutput(nil)
+	return
 }
 
 func ArgsCount(fs *flag.FlagSet) (count int) {
@@ -112,3 +123,7 @@ func SplitArgs(args []string, target ...string) (result []string, repacked []str
 	}
 	return
 }
+
+const NoArgsNeed = "no args need"
+
+var ErrWrongArgs = errors.New("wrong args")

@@ -4,10 +4,15 @@ import (
 	"fmt"
 	"io"
 	"math"
-
-	// TODO: readable
-	//"ember/base"
+	"os"
+	"sort"
+	"time"
+	"ember/base"
 )
+
+func (p *MeasureData) Print(readable bool) (err error) {
+	return p.Dump(os.Stdout, readable)
+}
 
 func (p *MeasureData) Dump(w io.Writer, readable bool) (err error) {
 	for _, it := range *p {
@@ -19,9 +24,61 @@ func (p *MeasureData) Dump(w io.Writer, readable bool) (err error) {
 	return
 }
 
-func (p *MeasureData) Merge(x *MeasureData) MeasureData {
-	// TODO
-	return *p
+func (p *MeasureData) Merge(x MeasureData, prefixA string, prefixB string) MeasureData {
+	data := *p
+	ret := MeasureData{}
+	a := 0
+	b := 0
+	for true {
+		if a >= len(x) {
+			if b >= len(x) {
+				break
+			} else {
+				ret.AppendSpan(x[b], prefixB)
+				b += 1
+			}
+		} else {
+			if b >= len(x) {
+				ret.AppendSpan(data[a], prefixA)
+				a += 1
+			} else {
+				if data[a].Time > x[b].Time {
+					ret.AppendSpan(x[b], prefixB)
+					b += 1
+				} else {
+					ret.AppendSpan(data[a], prefixA)
+					a += 1
+				}
+			}
+		}
+	}
+	return ret
+}
+
+func (p *MeasureData) AppendSpan(x *SpanData, prefix string) {
+	data := *p
+	last := data[len(data) - 1]
+
+	if last.Time == 0 {
+		last.Time = x.Time
+	}
+
+	if last.Time < x.Time {
+		n := NewSpanData()
+		n.Time = x.Time
+		*p = append(*p, n)
+		data = *p
+		last = n
+	}
+
+	for k, v := range x.Data {
+		k = prefix + k
+		if _, ok := last.Data[k]; !ok {
+			last.Data[k] = NewSpecData()
+		}
+		last.Data[k].Merge(v)
+	}
+	return
 }
 
 func (p *MeasureData) After(time int64) MeasureData {
@@ -102,16 +159,33 @@ func NewMeasureData(count int) MeasureData {
 
 type MeasureData []*SpanData
 
+func (p *SpanData) Print(readable bool) (err error) {
+	return p.Dump(os.Stdout, readable)
+}
+
 func (p *SpanData) Dump(w io.Writer, readable bool) (err error) {
 	if p.Time == 0 {
 		return
 	}
-	_, err = w.Write([]byte(fmt.Sprintf("[Time Stamp: %d]\n", p.Time / 1e9)))
+	if readable {
+		_, err = w.Write([]byte(fmt.Sprintf("[Time Stamp: %d (%s)]\n", p.Time / 1e9, time.Unix(0, p.Time).Format(TimeFormat))))
+	} else {
+		_, err = w.Write([]byte(fmt.Sprintf("@%d\n", p.Time / 1e9)))
+	}
 	if err != nil {
 		return
 	}
-	for k, v := range p.Data {
-		_, err = w.Write([]byte(fmt.Sprintf("%s %s\n", k, v.Dump(readable))))
+	keys := []string{}
+	for k, _ := range p.Data {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+	for _, k := range keys {
+		if readable {
+			_, err = w.Write([]byte(fmt.Sprintf("%s: %s\n", k, p.Data[k].Dump(readable))))
+		} else {
+			_, err = w.Write([]byte(fmt.Sprintf("%s %s\n", k, p.Data[k].Dump(readable))))
+		}
 		if err != nil {
 			return
 		}
@@ -162,10 +236,18 @@ func (p *SpecData) Dump(readable bool) string {
 	}
 
 	if readable {
-		return fmt.Sprintf("%d %d %d %d", p.Min, p.Max, p.Count, avg)
+		return fmt.Sprintf("min:%s max:%s cnt:%s avg:%s",
+			base.Nkmg(p.Min, 4), base.Nkmg(p.Max, 4), base.Nkmg(p.Count, 4), base.Nkmg(avg, 4))
 	} else {
 		return fmt.Sprintf("%d %d %d %d", p.Min, p.Max, p.Count, avg)
 	}
+}
+
+func (p *SpecData) Merge(x *SpecData) {
+	p.Max = Max(p.Max, x.Max)
+	p.Min = Min(p.Min, x.Min)
+	p.Sum = Sum(p.Sum, x.Sum)
+	p.Count = Sum(p.Count, x.Count)
 }
 
 func (p *SpecData) Record(value int64) {
@@ -182,3 +264,5 @@ func NewSpecData() *SpecData {
 type SpecData struct {
 	Max, Min, Sum, Count int64
 }
+
+const TimeFormat = "2006-01-02/15:04:05"
